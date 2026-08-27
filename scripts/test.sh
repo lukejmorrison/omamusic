@@ -72,10 +72,17 @@ if command -v rg >/dev/null 2>&1; then
     echo "test.sh: playback-runtime.sh must sync the full backend and health-check" >&2
     exit 1
   fi
-  if ! rg -q 'cargo build' scripts/setup.sh \
+  if ! rg -q 'releases/download' scripts/setup.sh \
+      || ! rg -q 'SHA256SUMS' scripts/setup.sh \
       || ! rg -q 'CARGO_TARGET_DIR' scripts/setup.sh \
       || ! rg -q 'omamusic.service' scripts/setup.sh; then
-    echo "test.sh: setup.sh must install the omamusic Rust daemon" >&2
+    echo "test.sh: setup.sh must download a pinned prebuilt omamusic, then cargo" >&2
+    exit 1
+  fi
+  if [[ ! -f scripts/backend-release ]] \
+      || ! rg -q '^RELEASE_VERSION=' scripts/backend-release \
+      || ! rg -q '^RELEASE_REPO=' scripts/backend-release; then
+    echo "test.sh: scripts/backend-release must pin the GitHub Release" >&2
     exit 1
   fi
   if ! rg -q 'queue_session.py' scripts/setup.sh \
@@ -123,5 +130,6 @@ bash -n scripts/remove-runtime.sh
 [[ -f scripts/omarchy-ytmusic ]] && bash -n scripts/omarchy-ytmusic
 [[ -f scripts/install-agent-skill.sh ]] && bash -n scripts/install-agent-skill.sh
 [[ -f scripts/setup-rust.sh ]] && bash -n scripts/setup-rust.sh
+[[ -f scripts/publish-backend.sh ]] && bash -n scripts/publish-backend.sh
 
 echo "All validation and tests passed."

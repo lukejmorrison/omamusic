@@ -21,11 +21,11 @@ Needs `mpv` and `yt-dlp`:
 omarchy pkg add mpv yt-dlp
 ```
 
-The first time you play something, the plugin installs a systemd user unit
-that is **never enabled at login**. With `cargo`, that unit is
-`omamusic.service`. Without it, setup falls back to
-`omarchy-ytmusic.service` (Python). The player starts the unit when you
-need it.
+The first time you play something, the plugin downloads a prebuilt
+`omamusic` daemon and installs `omamusic.service`, which is **never
+enabled at login**. If that download fails, setup builds from source
+when `cargo` is present, or falls back to `omarchy-ytmusic.service`
+(Python). The player starts the unit when you need it.
 
 ## Sign in
 

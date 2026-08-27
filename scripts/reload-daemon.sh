@@ -17,6 +17,10 @@ if [[ ${1:-} == -h || ${1:-} == --help ]]; then
   exit 0
 fi
 
-"$source_root/scripts/setup.sh"
+if command -v cargo >/dev/null 2>&1; then
+  "$source_root/scripts/setup.sh" --from-source
+else
+  "$source_root/scripts/setup.sh"
+fi
 "$source_root/scripts/playback-runtime.sh" restart "$source_root"
 echo "Reloaded playback backend."

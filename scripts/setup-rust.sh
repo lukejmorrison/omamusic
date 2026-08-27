@@ -7,8 +7,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/setup-rust.sh
 
-Build omamusic and install the unprivileged user unit. Same as
-scripts/setup.sh --rust. The unit is never enabled at login.
+Build omamusic from this checkout and install the unprivileged user unit.
+Same as scripts/setup.sh --from-source. The unit is never enabled at login.
 EOF
 }
 
@@ -17,4 +17,4 @@ if [[ ${1:-} == -h || ${1:-} == --help ]]; then
   exit 0
 fi
 
-exec "$source_root/scripts/setup.sh" --rust
+exec "$source_root/scripts/setup.sh" --from-source
