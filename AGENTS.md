@@ -4,7 +4,7 @@ Plugin id **`wizwam.omamusic`**. Binary **`omamusic`**. Work only here:
 
 | Path | Role |
 |------|------|
-| `/home/luke/dev/omamusic` | This repository (QML plugin + Python backend + Rust daemon) |
+| `/home/luke/dev/omamusic` | This repository (QML plugin + Rust daemon; Python fallback) |
 
 Do **not** open `/home/luke/dev/Omarchy/omarchy` as a second Grok workspace.
 **Never clone or use `/home/luke/dev/omarchy`.** That lowercase path collides
@@ -25,13 +25,10 @@ cd /home/luke/dev/omamusic
 ./scripts/test.sh
 ```
 
-Optional Rust daemon tests (needs `cargo`):
+`test.sh` runs the Rust daemon tests (`cargo` required) and the Python
+fallback tests. `./scripts/test-rust.sh` is the Rust-only subset.
 
-```bash
-./scripts/test-rust.sh
-```
-
-After a local plugin fix, reload QML and the Python/Rust backend:
+After a local plugin fix, rebuild the daemon and reload QML:
 
 ```bash
 ./scripts/reload.sh
