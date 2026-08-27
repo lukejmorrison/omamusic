@@ -1,6 +1,6 @@
 # `omarchy-ytmusic` CLI — how to use it
 
-Index on the [repo homepage](https://github.com/lukejmorrison/omarchy#documentation).
+Index on the [repo homepage](https://github.com/lukejmorrison/omamusic).
 
 A small command for **this computer’s** YouTube Music player. Agents (Hermes,
 OpenClaw, Grok, a local LLM) should use this instead of inventing HTTP or

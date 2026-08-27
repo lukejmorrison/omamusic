@@ -1,6 +1,6 @@
 # YouTube Music player — how to use it
 
-Index on the [repo homepage](https://github.com/lukejmorrison/omarchy#documentation).
+Index on the [repo homepage](https://github.com/lukejmorrison/omamusic).
 
 Plugin id `wizwam.omamusic`. This is the **Omarchy bar + full window** player:
 search, library, playlists, a mini player, and local **mpv** playback. It is
@@ -12,7 +12,7 @@ The command-line / agent interface is a separate page:
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/lukejmorrison/omarchy.git --enable
+omarchy plugin add https://github.com/lukejmorrison/omamusic.git --enable
 ```
 
 Needs `mpv` and `yt-dlp`:
