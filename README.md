@@ -1,4 +1,4 @@
-# OmaMusic
+# OMA Music
 
 ![OMA Music mini player with live spectrum and EQ](preview.png)
 

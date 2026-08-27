@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "wizwam.omamusic",
-  "name": "OmaMusic",
+  "name": "OMA Music",
   "version": "1.3.0",
   "author": "Wizwam",
   "license": "MIT",
@@ -19,7 +19,7 @@
     "panel": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "OmaMusic",
+    "displayName": "OMA Music",
     "description": "Native YouTube Music player with a mini player, live spectrum, and local mpv playback.",
     "category": "Media",
     "aliases": [

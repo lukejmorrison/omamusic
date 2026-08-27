@@ -66,6 +66,12 @@ if command -v rg >/dev/null 2>&1; then
     echo "test.sh: playback-runtime.sh must sync the full backend and health-check" >&2
     exit 1
   fi
+  if ! rg -q 'queue_session.py' scripts/setup.sh \
+      || ! rg -q 'play_history.py' scripts/setup.sh \
+      || ! rg -q 'spectrum.py' scripts/setup.sh; then
+    echo "test.sh: setup.sh must install the full Python backend" >&2
+    exit 1
+  fi
   if ! rg -q 'omamusic.service' scripts/playback-runtime.sh \
       || ! rg -q 'omamusic/backend.sock' scripts/playback-runtime.sh \
       || ! rg -q 'stop_other_backend' scripts/playback-runtime.sh; then
