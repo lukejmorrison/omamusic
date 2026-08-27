@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+lib_cli="${OMARCHY_YTMUSIC_CLI:-$HOME/.local/lib/omarchy-ytmusic/cli.py}"
+if [[ -f $lib_cli ]]; then
+  exec python3 "$lib_cli" "$@"
+fi
+
+plugin_cli="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/backend/cli.py"
+if [[ -f $plugin_cli ]]; then
+  exec python3 "$plugin_cli" "$@"
+fi
+
+echo "omarchy-ytmusic: CLI is not installed. Run plugins/ytmusic/scripts/setup.sh" >&2
+exit 3

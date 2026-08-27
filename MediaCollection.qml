@@ -1,0 +1,455 @@
+import QtQuick
+import QtQuick.Controls
+import qs.Commons
+import qs.Ui
+
+import "Api.js" as Api
+
+Item {
+  id: root
+
+  required property var service
+  property var sourceItems: []
+  property string filterText: ""
+  property string sortKey: "default"
+  property string contextUri: ""
+  property bool showFilter: true
+  property bool showSort: showFilter
+  property bool showQueue: true
+  property bool showPlaylist: true
+  property bool showSave: true
+  property bool browseContexts: true
+  property bool loading: false
+  property bool hasMore: false
+  property string emptyMessage: "Nothing here yet."
+  property real restoredContentY: 0
+  property string stateKey: ""
+  property bool restoreApplied: false
+  property bool allowReorder: false
+  property bool allowTrackDrag: false
+  property bool reorderBusy: false
+  property int dragSourceIndex: -1
+  property int dragDestinationIndex: -1
+  property int trackDragIndex: -1
+  property real dragSceneY: 0
+  property int dragAutoScrollDirection: 0
+
+  readonly property string playingTrackId: service && service.currentTrackId
+    ? String(service.currentTrackId) : ""
+  readonly property real areaRadius: Math.max(Style.space(14), Style.cornerRadius)
+  readonly property var visibleItems: Api.filteredSorted(sourceItems, filterText, sortKey)
+  readonly property var sortKeys: ["default", "name", "artist", "album", "duration"]
+  readonly property bool canReorder: allowReorder && !reorderBusy
+    && String(filterText || "").trim() === "" && sortKey === "default"
+    && visibleItems.length > 1
+  readonly property bool canTrackDrag: allowTrackDrag && !reorderBusy
+    && dragSourceIndex < 0 && trackDragIndex < 0
+  readonly property var dragItem: dragSourceIndex >= 0
+    && dragSourceIndex < visibleItems.length ? visibleItems[dragSourceIndex]
+    : (trackDragIndex >= 0 && trackDragIndex < visibleItems.length
+      ? visibleItems[trackDragIndex] : null)
+  readonly property bool dragActive: dragSourceIndex >= 0 || trackDragIndex >= 0
+
+  signal activated(var item, var sourceItems, string contextUri)
+  signal opened(var item)
+  signal queued(var item)
+  signal playlistRequested(var item)
+  signal saveToggled(var item)
+  signal contextRequested(var item, real sceneX, real sceneY, int index,
+    var sourceItems, string contextUri)
+  signal reorderRequested(int sourceIndex, int destinationIndex)
+  signal trackDragStarted(var item)
+  signal trackDragFinished(var item)
+  signal loadMoreRequested()
+  signal viewStateChanged(string filterText, string sortKey, real contentY)
+
+  function sortLabel() {
+    if (sortKey === "name") return "Title"
+    if (sortKey === "artist") return "Artist"
+    if (sortKey === "album") return "Album"
+    if (sortKey === "duration") return "Duration"
+    return "Original"
+  }
+
+  function cycleSort() {
+    var index = sortKeys.indexOf(sortKey)
+    sortKey = sortKeys[(index + 1) % sortKeys.length]
+    viewStateChanged(filterText, sortKey, mediaList.contentY)
+  }
+
+  function focusList() {
+    mediaList.forceActiveFocus()
+    if (mediaList.currentIndex < 0 && mediaList.count > 0) mediaList.currentIndex = 0
+  }
+
+  function reorderIndexAtSceneY(sceneY) {
+    if (mediaList.count <= 0) return -1
+    var top = mediaList.mapToItem(null, 0, 0)
+    var bottom = mediaList.mapToItem(null, 0, mediaList.height)
+    var center = mediaList.mapToItem(null, mediaList.width / 2, 0)
+    var clampedY = Math.max(top.y + 1, Math.min(bottom.y - 1, sceneY))
+    var contentPoint = mediaList.contentItem.mapFromItem(null, center.x, clampedY)
+    var candidate = mediaList.indexAt(contentPoint.x, contentPoint.y)
+    if (candidate >= 0) return candidate
+    var closest = -1
+    var closestDistance = Number.MAX_VALUE
+    for (var i = 0; i < mediaList.count; i++) {
+      var row = mediaList.itemAtIndex(i)
+      if (!row) continue
+      var rowCenter = row.mapToItem(null, row.width / 2, row.height / 2)
+      var distance = Math.abs(rowCenter.y - clampedY)
+      if (distance < closestDistance) {
+        closest = i
+        closestDistance = distance
+      }
+    }
+    if (closest >= 0) return closest
+    return contentPoint.y <= mediaList.originY ? 0 : mediaList.count - 1
+  }
+
+  function updateReorder(sceneY) {
+    if (dragSourceIndex < 0) return
+    dragSceneY = sceneY
+    dragDestinationIndex = reorderIndexAtSceneY(sceneY)
+    var center = mediaList.mapToItem(null, mediaList.width / 2, 0)
+    var point = mediaList.mapFromItem(null, center.x, sceneY)
+    var edge = Math.min(Style.space(48), mediaList.height / 3)
+    dragAutoScrollDirection = point.y < edge ? -1
+      : (point.y > mediaList.height - edge ? 1 : 0)
+  }
+
+  function beginReorder(index, sceneY) {
+    if (!canReorder || index < 0 || index >= visibleItems.length) return
+    mediaList.cancelFlick()
+    dragSourceIndex = index
+    dragDestinationIndex = index
+    dragSceneY = sceneY
+    dragAutoScrollDirection = 0
+  }
+
+  function finishReorder(sceneY, canceled) {
+    if (dragSourceIndex < 0) return
+    if (!canceled) updateReorder(sceneY)
+    var source = dragSourceIndex
+    var destination = dragDestinationIndex
+    dragSourceIndex = -1
+    dragDestinationIndex = -1
+    dragAutoScrollDirection = 0
+    rememberView()
+    if (!canceled && destination >= 0 && destination !== source)
+      reorderRequested(source, destination)
+  }
+
+  function cancelReorder() {
+    finishReorder(dragSceneY, true)
+  }
+
+  function updateTrackDrag(sceneY) {
+    if (trackDragIndex < 0) return
+    dragSceneY = sceneY
+    var center = mediaList.mapToItem(null, mediaList.width / 2, 0)
+    var point = mediaList.mapFromItem(null, center.x, sceneY)
+    var edge = Math.min(Style.space(48), mediaList.height / 3)
+    dragAutoScrollDirection = point.y < edge ? -1
+      : (point.y > mediaList.height - edge ? 1 : 0)
+  }
+
+  function beginTrackDrag(index, sceneY, item) {
+    if (!canTrackDrag || !item || item.type !== "track") return
+    mediaList.cancelFlick()
+    trackDragIndex = index
+    dragSceneY = sceneY
+    dragAutoScrollDirection = 0
+    trackDragStarted(item)
+  }
+
+  function finishTrackDrag(sceneY, canceled, item) {
+    if (trackDragIndex < 0) return
+    trackDragIndex = -1
+    dragAutoScrollDirection = 0
+    if (!canceled && item) trackDragFinished(item)
+  }
+
+  function rememberView() {
+    viewStateChanged(filterText, sortKey, mediaList.contentY)
+  }
+
+  function restoreView() {
+    if (restoreApplied || restoredContentY <= 0 || mediaList.count <= 0) return
+    restoreTimer.restart()
+  }
+
+  function resetRestore() {
+    restoreApplied = false
+    restoreTimer.restart()
+  }
+
+  Timer {
+    id: restoreTimer
+    interval: 0
+    onTriggered: {
+      if (root.restoreApplied) return
+      if (root.restoredContentY <= 0) {
+        mediaList.contentY = mediaList.originY
+        root.restoreApplied = true
+        return
+      }
+      if (mediaList.count <= 0) return
+      var maximum = Math.max(mediaList.originY,
+        mediaList.contentHeight - mediaList.height + mediaList.originY)
+      mediaList.contentY = Math.max(mediaList.originY,
+        Math.min(maximum, root.restoredContentY))
+      root.restoreApplied = true
+    }
+  }
+
+  Component.onCompleted: restoreView()
+  onRestoredContentYChanged: resetRestore()
+  onStateKeyChanged: resetRestore()
+  onCanReorderChanged: if (!canReorder) cancelReorder()
+  onCanTrackDragChanged: if (!canTrackDrag && trackDragIndex >= 0)
+    finishTrackDrag(dragSceneY, true, null)
+  Component.onDestruction: rememberView()
+
+  Timer {
+    interval: 30
+    repeat: true
+    running: root.dragActive && root.dragAutoScrollDirection !== 0
+    onTriggered: {
+      var minimum = mediaList.originY
+      var maximum = Math.max(minimum,
+        mediaList.contentHeight - mediaList.height + mediaList.originY)
+      var next = Math.max(minimum, Math.min(maximum,
+        mediaList.contentY + root.dragAutoScrollDirection * Style.space(9)))
+      if (next === mediaList.contentY) return
+      mediaList.contentY = next
+      root.updateReorder(root.dragSceneY)
+    }
+  }
+
+  Column {
+    anchors.fill: parent
+    spacing: Style.space(7)
+
+    Row {
+      id: tools
+      width: parent.width
+      height: visible ? Style.space(38) : 0
+      visible: root.showFilter || root.showSort
+      spacing: Style.space(7)
+
+      RoundedField {
+        id: filterField
+        visible: root.showFilter
+        width: visible ? Math.max(80, parent.width
+          - (sortButton.visible ? sortButton.width + parent.spacing : 0)
+          - countLabel.width - parent.spacing) : 0
+        foreground: Color.foreground
+        placeholderText: "Filter this list"
+        text: root.filterText
+        areaRadius: root.areaRadius
+        Accessible.name: "Filter this list"
+        onTextEdited: {
+          root.filterText = text
+          root.viewStateChanged(root.filterText, root.sortKey, mediaList.contentY)
+        }
+        Keys.onDownPressed: root.focusList()
+      }
+
+      Button {
+        id: sortButton
+        visible: root.showSort
+        text: root.sortLabel()
+        iconText: "󰒺"
+        foreground: Color.foreground
+        tooltipText: "Change sort order. Current: " + root.sortLabel()
+        Accessible.name: "Change sort order"
+        Accessible.description: "Currently sorted by " + root.sortLabel()
+        onClicked: root.cycleSort()
+      }
+
+      Text {
+        id: countLabel
+        anchors.verticalCenter: parent.verticalCenter
+        visible: text !== ""
+        text: Api.collectionCountLabel(
+          root.visibleItems.length, root.filterText, root.loading)
+        color: Qt.darker(Color.foreground, 1.42)
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+        Accessible.role: Accessible.StaticText
+        Accessible.name: text
+      }
+    }
+
+    ListView {
+      id: mediaList
+      width: parent.width
+      height: Math.max(30, parent.height - tools.height - moreButton.height
+        - emptyLabel.height - parent.spacing * 3)
+      model: root.visibleItems
+      clip: true
+      Accessible.role: Accessible.List
+      Accessible.name: "Songs"
+      spacing: Style.space(3)
+      reuseItems: true
+      cacheBuffer: Style.space(160)
+      interactive: !root.dragActive
+      activeFocusOnTab: true
+      keyNavigationEnabled: true
+      highlightFollowsCurrentItem: true
+      ScrollBar.vertical: ScrollBar { }
+      onMovementEnded: root.rememberView()
+      onCountChanged: {
+        root.restoreView()
+        if (root.dragSourceIndex >= count) root.cancelReorder()
+      }
+
+      FastScrollHandler {
+        parent: mediaList
+        flickable: mediaList
+        onScrolled: root.rememberView()
+      }
+
+      Keys.onReturnPressed: if (currentItem) currentItem.triggerPrimary()
+      Keys.onEnterPressed: if (currentItem) currentItem.triggerPrimary()
+      Keys.onPressed: function(event) {
+        if (!currentItem || !currentItem.itemData) return
+        var text = String(event.text || "").toLowerCase()
+        if (text === "q") {
+          root.queued(currentItem.itemData)
+          event.accepted = true
+        } else if (text === "l") {
+          root.saveToggled(currentItem.itemData)
+          event.accepted = true
+        }
+      }
+
+      delegate: MediaRow {
+        required property var modelData
+        required property int index
+        itemData: modelData
+        foreground: Color.foreground
+        accent: Color.accent
+        fontFamily: Style.font.family
+        playing: root.playingTrackId !== ""
+          && Api.trackVideoId(modelData) === root.playingTrackId
+        selected: ListView.isCurrentItem && !playing
+        areaRadius: root.areaRadius
+        browseOnActivate: root.browseContexts && modelData.kind === "context"
+        showQueue: root.showQueue
+        showPlaylist: root.showPlaylist
+        showSave: root.showSave
+        reorderEnabled: root.canReorder
+        trackDragEnabled: root.canTrackDrag && modelData && modelData.type === "track"
+        reorderDragging: root.dragSourceIndex === index
+        trackDragging: root.trackDragIndex === index
+        reorderDropIndicator: root.dragDestinationIndex === index
+          && root.dragSourceIndex !== index
+          ? (index < root.dragSourceIndex ? -1 : 1) : 0
+        saved: root.service ? root.service.isSaved(modelData) : false
+        onActivated: function(item) {
+          root.activated(item, root.visibleItems, root.contextUri)
+        }
+        onOpenRequested: function(item) { root.opened(item) }
+        onArtistRequested: function(item) { root.opened(item) }
+        onAlbumRequested: function(item) { root.opened(item) }
+        onQueueRequested: function(item) { root.queued(item) }
+        onPlaylistRequested: function(item) { root.playlistRequested(item) }
+        onSaveRequested: function(item) { root.saveToggled(item) }
+        onContextRequested: function(item, sceneX, sceneY) {
+          root.contextRequested(item, sceneX, sceneY, index,
+            root.visibleItems, root.contextUri)
+        }
+        onReorderDragStarted: function(sceneY) {
+          root.beginReorder(index, sceneY)
+        }
+        onReorderDragMoved: function(sceneY) { root.updateReorder(sceneY) }
+        onReorderDragFinished: function(sceneY) {
+          root.finishReorder(sceneY, false)
+        }
+        onReorderDragCanceled: root.cancelReorder()
+        onTrackDragStarted: function(sceneY) {
+          root.beginTrackDrag(index, sceneY, modelData)
+        }
+        onTrackDragMoved: function(sceneY) { root.updateTrackDrag(sceneY) }
+        onTrackDragFinished: function(sceneY) {
+          root.finishTrackDrag(sceneY, false, modelData)
+        }
+        onTrackDragCanceled: root.finishTrackDrag(root.dragSceneY, true, null)
+      }
+    }
+
+    Text {
+      id: emptyLabel
+      width: parent.width
+      height: visible ? contentHeight : 0
+      visible: root.visibleItems.length === 0
+      text: root.emptyMessage
+      color: Qt.darker(Color.foreground, 1.4)
+      font.family: Style.font.family
+      font.pixelSize: Style.font.bodySmall
+      horizontalAlignment: Text.AlignHCenter
+      wrapMode: Text.WordWrap
+    }
+
+    Button {
+      id: moreButton
+      anchors.horizontalCenter: parent.horizontalCenter
+      height: visible ? implicitHeight : 0
+      visible: root.hasMore || (root.loading && root.visibleItems.length > 0)
+      text: root.loading ? "Loading…" : "Load more"
+      foreground: Color.foreground
+      enabled: root.hasMore && !root.loading
+      tooltipText: root.loading ? "Loading more songs" : "Load more songs"
+      Accessible.name: text
+      onClicked: root.loadMoreRequested()
+    }
+  }
+
+  BorderSurface {
+    id: dragPreview
+    x: Style.space(4)
+    width: Math.max(40, parent.width - Style.space(8))
+    height: Style.space(48)
+    y: Math.max(0, Math.min(parent.height - height,
+      root.mapFromItem(null, 0, root.dragSceneY).y - height / 2))
+    visible: root.dragActive && !!root.dragItem
+    enabled: false
+    z: 20
+    radius: Style.cornerRadius
+    color: Style.selectedFillFor(Color.foreground, Color.accent)
+    borderSpec: Border.controlSpec("selected", Color.foreground, Color.accent)
+    opacity: 0.94
+
+    Row {
+      anchors.fill: parent
+      anchors.margins: Style.space(8)
+      spacing: Style.space(8)
+
+      Column {
+        width: parent.width
+        anchors.verticalCenter: parent.verticalCenter
+
+        Text {
+          width: parent.width
+          text: root.dragItem ? String(root.dragItem.name || "Untitled") : ""
+          color: Color.foreground
+          font.family: Style.font.family
+          font.pixelSize: Style.font.body
+          font.bold: true
+          elide: Text.ElideRight
+        }
+
+        Text {
+          width: parent.width
+          text: root.dragItem ? String(root.dragItem.subtitle || "") : ""
+          color: Qt.darker(Color.foreground, 1.3)
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+      }
+    }
+  }
+}
