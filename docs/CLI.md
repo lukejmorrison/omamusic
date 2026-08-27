@@ -16,7 +16,7 @@ The GUI is documented in [USER.md](USER.md).
 
 `scripts/setup.sh` installs:
 
-- `~/.local/bin/omamusic` (when cargo is present)
+- `~/.local/bin/omamusic` (GitHub Release binary, or cargo if that fails)
 - `~/.local/bin/omarchy-ytmusic` (shim that prefers `omamusic`)
 
 For Grok / Hermes / OpenClaw skill links:

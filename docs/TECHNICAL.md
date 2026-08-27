@@ -28,8 +28,10 @@ talks to a private Unix socket using versioned newline-delimited JSON. When
 stays `$XDG_RUNTIME_DIR/omarchy-ytmusic/backend.sock`.
 
 The backend is supervised by a static systemd user unit that
-is never enabled at login. `omamusic` is the default daemon (Rust). Setup
-falls back to the Python port only when `cargo` is missing. The plugin
+is never enabled at login. `omamusic` is the default daemon (Rust).
+`scripts/setup.sh` downloads the binary pinned in
+`scripts/backend-release` from GitHub Releases, verifies `SHA256SUMS`,
+and only then tries `cargo` or the Python port. The plugin
 starts the unit when a UI is visible or you press play, and the backend
 exits after the configured idle period. The play queue is written to
 `play-queue.json` while you listen and on shutdown. A restart restores that

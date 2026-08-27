@@ -1,0 +1,5 @@
+# Pinned GitHub Release for the prebuilt omamusic daemon.
+# setup.sh downloads this tag and verifies SHA256SUMS from the same release.
+# Do not use "latest".
+RELEASE_REPO=lukejmorrison/omamusic
+RELEASE_VERSION=1.3.0

@@ -20,8 +20,9 @@ EQ, spectrum, and the bar pill from [bjarneo/cliamp](https://github.com/bjarneo/
 - **Super+Shift+M** toggles the full player (instead of Spotify)
 - Bar chip on the right, before the tray, with the current title
 
-Requires `mpv` and `yt-dlp`. Local install also needs `cargo` for the
-default Rust daemon. Without cargo, setup falls back to Python.
+Requires `mpv` and `yt-dlp`. Setup downloads a prebuilt `omamusic`
+daemon (no `cargo`). It builds from source if that download fails and
+`cargo` is present, and falls back to Python only if both are unavailable.
 
 ## Install
 
@@ -37,8 +38,8 @@ From a checkout:
 ```
 
 The first play starts an on-demand user unit. It is **never enabled at
-login**. `scripts/setup.sh` installs the Rust daemon (`omamusic`) when
-`cargo` is present, and the Python backend only when it is not.
+login**. `scripts/setup.sh` installs the Rust daemon (`omamusic`) from
+the pinned GitHub Release.
 
 ## Sign in
 

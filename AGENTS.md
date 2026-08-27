@@ -27,6 +27,8 @@ cd /home/luke/dev/omamusic
 
 `test.sh` runs the Rust daemon tests (`cargo` required) and the Python
 fallback tests. `./scripts/test-rust.sh` is the Rust-only subset.
+User installs download the pinned GitHub Release; developers rebuild
+with `./scripts/setup.sh --from-source`.
 
 After a local plugin fix, rebuild the daemon and reload QML:
 
