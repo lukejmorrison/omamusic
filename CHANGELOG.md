@@ -10,6 +10,10 @@
 
 ## Unreleased
 
+- `scripts/setup.sh` installs the `omamusic` Rust daemon by default when
+  `cargo` is present. Cargo writes to `~/.cache/omamusic/target` so Omarchy
+  does not hot-reload the plugin mid-build. Python remains a fallback when
+  cargo is missing (`setup.sh --python`).
 - Plugin name and bar widget are "OMA Music". Plugin id stays
   `wizwam.omamusic`.
 - `scripts/setup.sh` copies `queue_session.py` with the rest of the Python

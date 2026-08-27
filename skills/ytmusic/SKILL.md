@@ -50,7 +50,8 @@ commands when `terminal` is available.
 3. **Status first** when asked what is playing: `omarchy-ytmusic --json status`.
 4. **Play a named song** with `omarchy-ytmusic --json play QUERY`. Bare `play`
    only resumes.
-5. **Do not** print `~/.config/omarchy-ytmusic/browser.json`, cookies, or
+5. **Do not** print `~/.config/omamusic/browser.json` (or the legacy
+   `~/.config/omarchy-ytmusic/browser.json`), cookies, or
    headers. Sign-in is the player's **Use Chromium session** button.
 6. **Do not** edit `$OMARCHY_PATH` or `~/.local/share/omarchy/`.
 7. If stderr says the socket is missing, start the player once
@@ -88,11 +89,11 @@ omarchy shell -q wizwam.omamusic.player toggleMiniPlayer
 
 ## Stack
 
-- Socket: `$XDG_RUNTIME_DIR/omarchy-ytmusic/backend.sock` (NDJSON, protocol 1,
-  256 KiB frame cap).
-- Unit: `omarchy-ytmusic.service` (user, not enabled at login).
-- CLI: `~/.local/bin/omarchy-ytmusic` → `~/.local/lib/omarchy-ytmusic/cli.py`
-  (stdlib + `protocol.py` only).
+- Socket: `$XDG_RUNTIME_DIR/omamusic/backend.sock` (NDJSON, protocol 1,
+  256 KiB frame cap). Legacy Python: `$XDG_RUNTIME_DIR/omarchy-ytmusic/backend.sock`.
+- Unit: `omamusic.service` (user, not enabled at login). Legacy Python:
+  `omarchy-ytmusic.service`.
+- CLI: `~/.local/bin/omarchy-ytmusic` prefers `omamusic` when installed.
 - Catalog/likes need the Chromium session already imported in the player.
 - Related: `google-services` is OAuth playlist editing, not this player.
 
