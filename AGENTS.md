@@ -1,4 +1,4 @@
-# OmaMusic — agent notes
+# OMA Music — agent notes
 
 Plugin id **`wizwam.omamusic`**. Binary **`omamusic`**. Work only here:
 

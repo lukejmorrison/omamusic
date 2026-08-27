@@ -45,6 +45,7 @@ install -m 644 -- \
   "$source_root/backend/catalog.py" \
   "$source_root/backend/player.py" \
   "$source_root/backend/play_history.py" \
+  "$source_root/backend/queue_session.py" \
   "$source_root/backend/spectrum.py" \
   "$source_root/backend/cli.py" \
   "$lib_dir/"

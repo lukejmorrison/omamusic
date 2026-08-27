@@ -92,4 +92,4 @@ elif [[ $section == center ]]; then
 else
   omarchy plugin enable "$plugin_id" --section left --after omarchy.workspaces
 fi
-echo "Installed. Click the OmaMusic bar widget to sign in and play."
+echo "Installed. Click the OMA Music bar widget to sign in and play."
