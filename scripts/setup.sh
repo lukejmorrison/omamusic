@@ -53,7 +53,6 @@ auth_dir="$config_root/omamusic"
 
 install_cli_wrapper() {
   install -d -m 755 -- "$bin_dir"
-  install -m 755 -- "$source_root/scripts/omarchy-ytmusic" "$bin_dir/omarchy-ytmusic"
 }
 
 import_auth() {
@@ -85,7 +84,7 @@ finish_rust_install() {
   install_cli_wrapper
   "$bin_dir/omamusic" serve --self-test >/dev/null
   echo "Installed omamusic ($how) to $bin_dir/omamusic"
-  echo "CLI: $bin_dir/omarchy-ytmusic (shim) or $bin_dir/omamusic"
+  echo "CLI: $bin_dir/omamusic"
   echo "The user unit is $unit_file and is not enabled at login."
 }
 
@@ -145,10 +144,10 @@ install_python() {
     return 1
   }
 
-  local lib_dir="$HOME/.local/lib/omarchy-ytmusic"
-  local venv_dir="$data_root/omarchy-ytmusic/venv"
-  local py_unit_file="$unit_dir/omarchy-ytmusic.service"
-  local py_auth_dir="$config_root/omarchy-ytmusic"
+  local lib_dir="$HOME/.local/lib/omamusic"
+  local venv_dir="$data_root/omamusic/venv"
+  local py_unit_file="$unit_file"
+  local py_auth_dir="$auth_dir"
 
   # Never compile or write inside the plugin directory.
   install -d -m 700 -- "$lib_dir" "$py_auth_dir" "$unit_dir" "$(dirname -- "$venv_dir")"
@@ -174,16 +173,24 @@ install_python() {
     -r "$source_root/backend/requirements.txt"
 
   sed "s|ExecStart=.*|ExecStart=$venv_dir/bin/python $lib_dir/server.py|" \
-    "$source_root/systemd/omarchy-ytmusic.service" > "$py_unit_file"
+    "$source_root/systemd/omamusic-python.service" > "$py_unit_file"
   chmod 644 -- "$py_unit_file"
 
   systemctl --user daemon-reload
+  systemctl --user stop omarchy-ytmusic.service 2>/dev/null || true
   import_auth "$py_auth_dir"
   install_cli_wrapper
+  if [[ ! -x $bin_dir/omamusic ]]; then
+    cat > "$bin_dir/omamusic" <<EOF
+#!/usr/bin/env bash
+exec python3 "$lib_dir/cli.py" "\$@"
+EOF
+    chmod 755 -- "$bin_dir/omamusic"
+  fi
   "$venv_dir/bin/python" "$lib_dir/server.py" --self-test >/dev/null
 
-  echo "Installed legacy Python playback to $lib_dir"
-  echo "CLI: $bin_dir/omarchy-ytmusic"
+  echo "Installed Python playback fallback to $lib_dir"
+  echo "CLI: $bin_dir/omamusic (or python3 $lib_dir/cli.py)"
   echo "The user unit is $py_unit_file and is not enabled at login."
 }
 

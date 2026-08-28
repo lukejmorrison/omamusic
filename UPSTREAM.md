@@ -19,15 +19,14 @@ Wizwam additions also take cues from [cliamp](https://github.com/bjarneo/cliamp)
 - Plugin id: `wizwam.omamusic`
 - Published repo: https://github.com/lukejmorrison/omamusic
 
-## Runtime paths kept from upstream
+## Runtime paths
 
-Playback files stay under `omarchy-ytmusic` names so backend scripts and the
-user unit remain drop-in compatible:
+This fork uses `omamusic` names. Setup still imports a leftover
+`~/.config/omarchy-ytmusic/browser.json` if `~/.config/omamusic/` has none:
 
-- `~/.config/systemd/user/omarchy-ytmusic.service` (never enabled at login)
-- `~/.local/lib/omarchy-ytmusic/`
-- `~/.local/share/omarchy-ytmusic/venv`
-- `~/.config/omarchy-ytmusic/browser.json` (mode 600)
+- `~/.config/systemd/user/omamusic.service` (never enabled at login)
+- `~/.local/bin/omamusic`
+- `~/.config/omamusic/browser.json` (mode 600)
 
 ## Pulling upstream
 

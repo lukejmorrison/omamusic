@@ -50,8 +50,7 @@ the pinned GitHub Release.
 3. **Set up and continue** → **Use Chromium session**.
 
 Search and home work without login. Library, likes, and playlists need that
-session. Cookies land in `~/.config/omarchy-ytmusic/browser.json` (mode 600),
-or `~/.config/omamusic/browser.json` when the Rust daemon is in use.
+session. Cookies land in `~/.config/omamusic/browser.json` (mode 600).
 
 ## Controls
 
@@ -65,7 +64,7 @@ or `~/.config/omamusic/browser.json` when the Rust daemon is in use.
 
 ```bash
 omarchy shell -q wizwam.omamusic.player togglePlayer
-omarchy-ytmusic --json status
+omamusic --json status
 ```
 
 ## Remove
@@ -84,7 +83,7 @@ you want Spotify back on that key.
 | Manual | What it covers |
 | --- | --- |
 | **[Player how-to](docs/USER.md)** | Sign in, bar chip, mini player, full window, EQ, shortcuts |
-| **[CLI how-to](docs/CLI.md)** | `omarchy-ytmusic` for terminals and agents |
+| **[CLI how-to](docs/CLI.md)** | `omamusic` for terminals and agents |
 | [Technical notes](docs/TECHNICAL.md) | Socket protocol and backends |
 
 ## License

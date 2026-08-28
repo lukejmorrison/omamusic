@@ -97,9 +97,8 @@ if command -v rg >/dev/null 2>&1; then
     echo "test.sh: playback-runtime.sh must prefer omamusic when it is installed" >&2
     exit 1
   fi
-  if [[ -f scripts/omarchy-ytmusic ]] && { ! rg -q 'omarchy-ytmusic' scripts/setup.sh \
-      || ! rg -q 'omamusic' scripts/omarchy-ytmusic; }; then
-    echo "test.sh: setup.sh must install the CLI wrapper that prefers omamusic" >&2
+  if ! rg -q 'omamusic' scripts/setup.sh; then
+    echo "test.sh: setup.sh must install the omamusic CLI" >&2
     exit 1
   fi
   if ! rg -q 'omamusic.service' scripts/remove-runtime.sh \

@@ -163,7 +163,7 @@ def mpv_command_line(binary: str, ipc_path: Path, mpris: str = "") -> list[str]:
         "--no-input-default-bindings",
         "--volume=80",
         "--title=YouTube Music",
-        "--audio-client-name=omarchy-ytmusic",
+        "--audio-client-name=omamusic",
         f"--input-ipc-server={ipc_path}",
         "--msg-level=cplayer=info,ao=info,ffmpeg=warn",
     ]
@@ -334,7 +334,7 @@ def stale_mpv_pids(ipc_path: Path) -> list[int]:
         except OSError:
             continue
         cmd = raw.replace(b"\0", b" ").decode("utf-8", "replace")
-        if "audio-client-name=omarchy-ytmusic" not in cmd:
+        if "audio-client-name=omamusic" not in cmd:
             continue
         if f"--input-ipc-server={ours}" in cmd:
             continue

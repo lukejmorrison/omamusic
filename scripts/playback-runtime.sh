@@ -8,11 +8,11 @@ if [[ -z $action || ( $# -gt 2 ) ]]; then
   exit 2
 fi
 
-venv_python="$HOME/.local/share/omarchy-ytmusic/venv/bin/python"
-lib_dir="$HOME/.local/lib/omarchy-ytmusic"
+venv_python="$HOME/.local/share/omamusic/venv/bin/python"
+lib_dir="$HOME/.local/lib/omamusic"
 backend_script="$lib_dir/server.py"
-python_unit=omarchy-ytmusic.service
 omamusic_unit=omamusic.service
+legacy_unit=omarchy-ytmusic.service
 backend_files=(server.py protocol.py auth.py catalog.py player.py play_history.py queue_session.py spectrum.py)
 
 omamusic_bin() {
@@ -28,7 +28,7 @@ unit_exists() {
 }
 
 python_ready() {
-  [[ -x $venv_python && -f $backend_script ]] && unit_exists "$python_unit" \
+  [[ -x $venv_python && -f $backend_script ]] && unit_exists "$omamusic_unit" \
     && command -v mpv >/dev/null 2>&1 && command -v yt-dlp >/dev/null 2>&1
 }
 
@@ -41,18 +41,13 @@ omamusic_ready() {
 
 if omamusic_ready; then
   backend=omamusic
-  unit=$omamusic_unit
 else
   backend=python
-  unit=$python_unit
 fi
+unit=$omamusic_unit
 
 socket_file() {
-  if [[ $backend == omamusic ]]; then
-    printf '%s/omamusic/backend.sock\n' "${XDG_RUNTIME_DIR:-/tmp}"
-  else
-    printf '%s/omarchy-ytmusic/backend.sock\n' "${XDG_RUNTIME_DIR:-/tmp}"
-  fi
+  printf '%s/omamusic/backend.sock\n' "${XDG_RUNTIME_DIR:-/tmp}"
 }
 
 runtime_ready() {
@@ -64,11 +59,7 @@ runtime_ready() {
 }
 
 stop_other_backend() {
-  if [[ $backend == omamusic ]]; then
-    systemctl --user stop "$python_unit" 2>/dev/null || true
-  else
-    systemctl --user stop "$omamusic_unit" 2>/dev/null || true
-  fi
+  systemctl --user stop "$legacy_unit" 2>/dev/null || true
 }
 
 compile_backend() {

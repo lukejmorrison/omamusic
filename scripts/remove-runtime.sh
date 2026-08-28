@@ -21,8 +21,8 @@ rm -f -- \
   "$config_root/systemd/user/omarchy-ytmusic.service"
 systemctl --user daemon-reload 2>/dev/null || true
 
-rm -f -- "$HOME/.local/bin/omamusic"
-rm -rf -- "$HOME/.local/lib/omarchy-ytmusic"
+rm -f -- "$HOME/.local/bin/omamusic" "$HOME/.local/bin/omarchy-ytmusic"
+rm -rf -- "$HOME/.local/lib/omamusic" "$HOME/.local/lib/omarchy-ytmusic"
 rm -f -- \
   "$runtime_root/omamusic/backend.sock" \
   "$runtime_root/omamusic/mpv.sock" \
@@ -31,14 +31,14 @@ rm -f -- \
 
 if (( purge )); then
   rm -rf -- \
+    "$data_root/omamusic" \
     "$data_root/omarchy-ytmusic" \
-    "$config_root/omarchy-ytmusic" \
     "$config_root/omamusic" \
-    "$cache_root/omarchy-ytmusic" \
+    "$config_root/omarchy-ytmusic" \
     "$cache_root/omamusic" \
-    "$runtime_root/omarchy-ytmusic" \
-    "$runtime_root/omamusic"
-  rm -f -- "$HOME/.local/bin/omarchy-ytmusic"
+    "$cache_root/omarchy-ytmusic" \
+    "$runtime_root/omamusic" \
+    "$runtime_root/omarchy-ytmusic"
 fi
 
 echo "Removed the OMA Music playback units and installed backend."

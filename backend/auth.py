@@ -14,8 +14,8 @@ from pathlib import Path
 
 DEFAULT_AUTH_NAME = "browser.json"
 LEGACY_AUTH = Path.home() / ".config" / "ytmusicbar" / "browser.json"
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "omarchy-ytmusic"
-CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "omarchy-ytmusic"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "omamusic"
+CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "omamusic"
 DEFAULT_AUTH = CONFIG_DIR / DEFAULT_AUTH_NAME
 
 CHROME_KEY_SALT = b"saltysalt"
@@ -312,7 +312,7 @@ def extract_youtube_cookies(
 def read_youtube_cookies(db_path: Path, password: bytes) -> list[tuple[str, str]]:
     key = derive_os_crypt_key(password)
     by_name: dict[str, tuple[int, str]] = {}
-    with tempfile.TemporaryDirectory(prefix="omarchy-ytmusic-cookies-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="omamusic-cookies-") as tmp:
         copied = _copy_sqlite(db_path, Path(tmp))
         connection = sqlite3.connect(str(copied))
         try:

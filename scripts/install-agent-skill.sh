@@ -3,18 +3,14 @@ set -euo pipefail
 
 source_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 skill_src="$source_root/skills/ytmusic/SKILL.md"
-wrapper="$source_root/scripts/omarchy-ytmusic"
-lib_dir="$HOME/.local/lib/omarchy-ytmusic"
-bin_dir="$HOME/.local/bin"
 
 usage() {
   cat <<'EOF'
 Usage: scripts/install-agent-skill.sh
 
-Install the YouTube Music agent skill and omarchy-ytmusic CLI for Grok,
-Hermes, OpenClaw, and other local agents. Does not enable the backend at
-login. Playback still starts when the player opens or when the CLI starts
-the existing user unit.
+Install the OMA Music agent skill for Grok, Hermes, OpenClaw, and other
+local agents. Playback uses the omamusic CLI from scripts/setup.sh. The
+user unit is not enabled at login.
 EOF
 }
 
@@ -27,15 +23,6 @@ fi
   echo "install-agent-skill.sh: missing $skill_src" >&2
   exit 1
 }
-
-install -d -m 755 -- "$lib_dir" "$bin_dir"
-install -m 644 -- "$source_root/backend/cli.py" "$lib_dir/"
-# The playback backend already ships protocol.py. Do not replace it with an
-# older copy if this machine is running a newer plugin checkout.
-if [[ ! -f $lib_dir/protocol.py ]]; then
-  install -m 644 -- "$source_root/backend/protocol.py" "$lib_dir/"
-fi
-install -m 755 -- "$wrapper" "$bin_dir/omarchy-ytmusic"
 
 link_skill() {
   local target=$1
@@ -57,5 +44,9 @@ if [[ -d /home/luke/dev/template_skills ]]; then
   echo "Linked template_skills/ytmusic"
 fi
 
-echo "Installed $bin_dir/omarchy-ytmusic"
-echo "Agents: use the ytmusic skill and run omarchy-ytmusic --json <command>"
+if command -v omamusic >/dev/null 2>&1 || [[ -x $HOME/.local/bin/omamusic ]]; then
+  echo "CLI: omamusic"
+else
+  echo "omamusic is not on PATH yet. Run scripts/setup.sh, then omamusic --json <command>."
+fi
+echo "Agents: use the ytmusic skill and run omamusic --json <command>"

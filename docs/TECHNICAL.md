@@ -19,13 +19,10 @@ lazy-loaded panel. There is no embedded website or browser engine.
 Catalog data uses the unofficial [`ytmusicapi`](https://github.com/sigma67/ytmusicapi)
 client. Local audio is **mpv**, with stream URLs from **yt-dlp**. mpv is launched
 headless (`--vo=null`, no Wayland/X display) and uses the D-Bus-safe client
-name `omarchy-ytmusic` so MPRIS cannot stall the player. Each track sets
+name `omamusic` so MPRIS cannot stall the player. Each track sets
 `force-media-title` so MPRIS clients show the song name, not the stream URL.
-The plugin
-talks to a private Unix socket using versioned newline-delimited JSON. When
-`omamusic` is installed that socket is
-`$XDG_RUNTIME_DIR/omamusic/backend.sock` (`omamusic.service`). Otherwise it
-stays `$XDG_RUNTIME_DIR/omarchy-ytmusic/backend.sock`.
+The plugin talks to a private Unix socket using versioned newline-delimited
+JSON at `$XDG_RUNTIME_DIR/omamusic/backend.sock` (`omamusic.service`).
 
 The backend is supervised by a static systemd user unit that
 is never enabled at login. `omamusic` is the default daemon (Rust).
@@ -49,11 +46,8 @@ installed backend lives outside the plugin tree. Cargo's target dir is
 - `$HOME/.config/omamusic/play-queue.json`
 - `$XDG_RUNTIME_DIR/omamusic/backend.sock`
 
-Legacy Python fallback (no cargo):
-
-- `$HOME/.local/share/omarchy-ytmusic/venv`
-- `$HOME/.local/lib/omarchy-ytmusic/`
-- `$HOME/.config/omarchy-ytmusic/browser.json`
+Python fallback (no cargo) uses the same `omamusic` unit, socket, and
+config dir, with the venv at `$HOME/.local/share/omamusic/venv`.
 
 ## Stream resolution
 

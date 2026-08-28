@@ -1,4 +1,4 @@
-# `omarchy-ytmusic` CLI — how to use it
+# `omamusic` CLI — how to use it
 
 Index on the [repo homepage](https://github.com/lukejmorrison/omamusic).
 
@@ -17,7 +17,6 @@ The GUI is documented in [USER.md](USER.md).
 `scripts/setup.sh` installs:
 
 - `~/.local/bin/omamusic` (GitHub Release binary, or cargo if that fails)
-- `~/.local/bin/omarchy-ytmusic` (shim that prefers `omamusic`)
 
 For Grok / Hermes / OpenClaw skill links:
 
@@ -31,14 +30,10 @@ player once with Super+Shift+M so the user unit exists.
 ## How it works
 
 ```
-omarchy-ytmusic  (or omamusic)
+omamusic
   → NDJSON on $XDG_RUNTIME_DIR/omamusic/backend.sock
     → omamusic.service (mpv + yt-dlp)
 ```
-
-Without cargo, the legacy Python socket and unit stay
-`$XDG_RUNTIME_DIR/omarchy-ytmusic/backend.sock` and
-`omarchy-ytmusic.service`.
 
 1. If the socket is missing, the CLI starts the selected user unit
    (`--no-start` skips that). The unit is still not enabled at login.
@@ -57,8 +52,8 @@ Exit codes: `0` ok, `1` command/backend error, `2` usage, `3` backend down.
 Opening the window is **not** the socket:
 
 ```bash
-omarchy-ytmusic open      # full player
-omarchy-ytmusic mini      # mini player
+omamusic open      # full player
+omamusic mini      # mini player
 # same as:
 omarchy shell -q wizwam.omamusic.player togglePlayer
 ```
@@ -66,23 +61,23 @@ omarchy shell -q wizwam.omamusic.player togglePlayer
 ## Everyday commands
 
 ```bash
-omarchy-ytmusic --json status
-omarchy-ytmusic --json play                 # resume
-omarchy-ytmusic --json play technologic     # search songs, play first hit
-omarchy-ytmusic --json pause
-omarchy-ytmusic --json next
-omarchy-ytmusic --json prev
-omarchy-ytmusic --json volume 40
-omarchy-ytmusic --json seek 1:30
-omarchy-ytmusic --json shuffle on
-omarchy-ytmusic --json repeat all
-omarchy-ytmusic --json search city pop
-omarchy-ytmusic --json play-id R5uHYAIkzgU
-omarchy-ytmusic --json like
-omarchy-ytmusic --json unlike
-omarchy-ytmusic --json queue
-omarchy-ytmusic --json browse playlists
-omarchy-ytmusic --json health
+omamusic --json status
+omamusic --json play                 # resume
+omamusic --json play technologic     # search songs, play first hit
+omamusic --json pause
+omamusic --json next
+omamusic --json prev
+omamusic --json volume 40
+omamusic --json seek 1:30
+omamusic --json shuffle on
+omamusic --json repeat all
+omamusic --json search city pop
+omamusic --json play-id R5uHYAIkzgU
+omamusic --json like
+omamusic --json unlike
+omamusic --json queue
+omamusic --json browse playlists
+omamusic --json health
 ```
 
 `play QUERY` searches **songs** and loads the first `videoId`. Bare `play`
@@ -93,8 +88,8 @@ only resumes.
 Your playlists are a browse, then a `load`:
 
 ```bash
-omarchy-ytmusic --json browse playlists
-omarchy-ytmusic --json raw load '{"playlist_id":"PLJFpg2A87Hzc"}'
+omamusic --json browse playlists
+omamusic --json raw load '{"playlist_id":"PLJFpg2A87Hzc"}'
 ```
 
 `browse` views include `home`, `playlists`, and other library shelves the
@@ -104,9 +99,9 @@ backend already serves. Likes and private lists need the Chromium session.
 album like). Examples:
 
 ```bash
-omarchy-ytmusic --json raw set_eq_preset '{"name":"Rock"}'
-omarchy-ytmusic --json raw get_playlist '{"item_id":"LM"}'
-omarchy-ytmusic --json raw sleep '{"minutes":30}'
+omamusic --json raw set_eq_preset '{"name":"Rock"}'
+omamusic --json raw get_playlist '{"item_id":"LM"}'
+omamusic --json raw sleep '{"minutes":30}'
 ```
 
 Use `item_id` for `get_playlist` / `get_album` / `get_artist`, not `id`
@@ -134,6 +129,6 @@ Use `item_id` for `get_playlist` / `get_album` / `get_artist`, not `id`
 Hermes, OpenClaw, and Grok: skill name `ytmusic`. Prefer the helper on PATH.
 
 ```bash
-omarchy-ytmusic --json status
-omarchy-ytmusic --json play here comes the sun
+omamusic --json status
+omamusic --json play here comes the sun
 ```
