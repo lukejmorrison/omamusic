@@ -1,6 +1,6 @@
 # OmaMusic
 
-![OmaMusic full player and mini player with live spectrum and EQ](preview.png)
+![OMA Music mini player with live spectrum and EQ](preview.png)
 
 Native [Omarchy](https://omarchy.org) player for **YouTube Music**. Plugin id
 `wizwam.omamusic`.
