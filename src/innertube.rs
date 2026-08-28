@@ -12,7 +12,7 @@ pub const USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0";
 pub const YTM_DOMAIN: &str = "https://music.youtube.com";
 pub const YTM_BASE_API: &str = "https://music.youtube.com/youtubei/v1/";
-const API_KEY: &str = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30";
+const API_KEY_ENV: &str = "YTM_API_KEY";
 
 #[derive(Clone)]
 pub struct Innertube {
@@ -20,6 +20,7 @@ pub struct Innertube {
     headers: HeaderMap,
     visitor_id: String,
     signed_in: bool,
+    api_key: String,
 }
 
 impl Innertube {
@@ -30,8 +31,9 @@ impl Innertube {
             headers: default_headers(),
             visitor_id: String::new(),
             signed_in: false,
+            api_key: String::new(),
         };
-        api.visitor_id = api.fetch_visitor_id().unwrap_or_default();
+        api.hydrate()?;
         Ok(api)
     }
 
@@ -61,8 +63,9 @@ impl Innertube {
             headers: map,
             visitor_id: String::new(),
             signed_in: true,
+            api_key: String::new(),
         };
-        api.visitor_id = api.fetch_visitor_id().unwrap_or_default();
+        api.hydrate()?;
         Ok(api)
     }
 
@@ -70,25 +73,32 @@ impl Innertube {
         self.signed_in
     }
 
-    fn fetch_visitor_id(&self) -> Result<String> {
+    fn hydrate(&mut self) -> Result<()> {
+        let html = match self.fetch_home_html() {
+            Ok(text) => Some(text),
+            Err(_) => None,
+        };
+        self.visitor_id = html
+            .as_deref()
+            .and_then(parse_ytcfg)
+            .and_then(|cfg| {
+                cfg.get("VISITOR_DATA")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+            .unwrap_or_default();
+        self.api_key = resolve_api_key(html.as_deref())?;
+        Ok(())
+    }
+
+    fn fetch_home_html(&self) -> Result<String> {
         let response = self
             .client
             .get(YTM_DOMAIN)
             .headers(default_headers())
             .send()
             .map_err(|e| Error::catalog(e.to_string()))?;
-        let text = response.text().unwrap_or_default();
-        if let Some(start) = text.find("ytcfg.set(") {
-            let slice = &text[start + 10..];
-            if let Some(end) = slice.find(");") {
-                if let Ok(cfg) = serde_json::from_str::<Value>(&slice[..end]) {
-                    if let Some(id) = cfg.get("VISITOR_DATA").and_then(Value::as_str) {
-                        return Ok(id.to_string());
-                    }
-                }
-            }
-        }
-        Ok(String::new())
+        Ok(response.text().unwrap_or_default())
     }
 
     fn context(&self) -> Value {
@@ -112,11 +122,7 @@ impl Innertube {
                 headers.insert("X-Goog-Visitor-Id", val);
             }
         }
-        let mut url = format!("{YTM_BASE_API}{endpoint}?alt=json");
-        if self.signed_in {
-            url.push_str("&key=");
-            url.push_str(API_KEY);
-        }
+        let url = innertube_url(endpoint, self.signed_in, &self.api_key);
         let response = self
             .client
             .post(&url)
@@ -326,6 +332,80 @@ fn search_params(filter: &str) -> Option<&'static str> {
         "videos" => Some("EgWKAQIQAWoMEA4QChADEAQQCRAF"),
         _ => None,
     }
+}
+
+fn innertube_url(endpoint: &str, signed_in: bool, api_key: &str) -> String {
+    let mut url = format!("{YTM_BASE_API}{endpoint}?alt=json");
+    if signed_in {
+        url.push_str("&key=");
+        url.push_str(api_key);
+    }
+    url
+}
+
+fn env_api_key() -> Option<String> {
+    match std::env::var(API_KEY_ENV) {
+        Ok(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Err(_) => None,
+    }
+}
+
+fn parse_ytcfg(html: &str) -> Option<Value> {
+    let start = html.find("ytcfg.set(")?;
+    let slice = &html[start + 10..];
+    let end = slice.find(");")?;
+    serde_json::from_str(&slice[..end]).ok()
+}
+
+fn parse_quoted_field(html: &str, field: &str) -> Option<String> {
+    let needle = format!("\"{field}\"");
+    let rest = html.split(&needle).nth(1)?;
+    let rest = rest.trim_start().strip_prefix(':')?.trim_start();
+    let rest = rest.strip_prefix('"')?;
+    let end = rest.find('"')?;
+    let value = rest[..end].trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
+fn parse_innertube_api_key(html: &str) -> Option<String> {
+    if let Some(cfg) = parse_ytcfg(html) {
+        if let Some(key) = cfg.get("INNERTUBE_API_KEY").and_then(Value::as_str) {
+            let key = key.trim();
+            if !key.is_empty() {
+                return Some(key.to_string());
+            }
+        }
+    }
+    parse_quoted_field(html, "INNERTUBE_API_KEY")
+}
+
+fn missing_api_key_error() -> Error {
+    Error::catalog(format!(
+        "Could not resolve YouTube Music InnerTube client key. Set {API_KEY_ENV} or ensure {YTM_DOMAIN} is reachable."
+    ))
+}
+
+fn resolve_api_key(html: Option<&str>) -> Result<String> {
+    if let Some(key) = env_api_key() {
+        return Ok(key);
+    }
+    if let Some(html) = html {
+        if let Some(key) = parse_innertube_api_key(html) {
+            return Ok(key);
+        }
+    }
+    Err(missing_api_key_error())
 }
 
 fn build_client() -> Result<Client> {
@@ -790,4 +870,127 @@ fn album_from_runs(value: &Value) -> Value {
         }
     });
     album
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct EnvGuard {
+        previous: Option<String>,
+        _lock: MutexGuard<'static, ()>,
+    }
+
+    impl EnvGuard {
+        fn lock() -> MutexGuard<'static, ()> {
+            ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner())
+        }
+
+        fn set(value: Option<&str>) -> Self {
+            let lock = Self::lock();
+            let previous = std::env::var(API_KEY_ENV).ok();
+            match value {
+                Some(value) => std::env::set_var(API_KEY_ENV, value),
+                None => std::env::remove_var(API_KEY_ENV),
+            }
+            Self {
+                previous,
+                _lock: lock,
+            }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(value) => std::env::set_var(API_KEY_ENV, value),
+                None => std::env::remove_var(API_KEY_ENV),
+            }
+        }
+    }
+
+    #[test]
+    fn parse_key_from_ytcfg_json() {
+        let html = r#"<script>ytcfg.set({"INNERTUBE_API_KEY":"ytm-test-client-key","VISITOR_DATA":"Cgtabc"});</script>"#;
+        assert_eq!(
+            parse_innertube_api_key(html).as_deref(),
+            Some("ytm-test-client-key")
+        );
+        assert_eq!(
+            parse_ytcfg(html)
+                .and_then(|cfg| cfg
+                    .get("VISITOR_DATA")
+                    .and_then(Value::as_str)
+                    .map(str::to_string))
+                .as_deref(),
+            Some("Cgtabc")
+        );
+    }
+
+    #[test]
+    fn parse_key_from_quoted_field_when_ytcfg_is_unparseable() {
+        let html = r#"var cfg = {"INNERTUBE_API_KEY":"quoted-test-key"};"#;
+        assert_eq!(
+            parse_innertube_api_key(html).as_deref(),
+            Some("quoted-test-key")
+        );
+    }
+
+    #[test]
+    fn parse_key_ignores_empty_values() {
+        assert_eq!(
+            parse_innertube_api_key(r#"ytcfg.set({"INNERTUBE_API_KEY":""});"#),
+            None
+        );
+        assert_eq!(parse_innertube_api_key("<html></html>"), None);
+    }
+
+    #[test]
+    fn resolve_prefers_env_over_page() {
+        let _guard = EnvGuard::set(Some("from-env-test-key"));
+        let html = r#"ytcfg.set({"INNERTUBE_API_KEY":"from-page-key"});"#;
+        assert_eq!(resolve_api_key(Some(html)).unwrap(), "from-env-test-key");
+    }
+
+    #[test]
+    fn resolve_uses_page_when_env_unset() {
+        let _guard = EnvGuard::set(None);
+        let html = r#"ytcfg.set({"INNERTUBE_API_KEY":"from-page-key"});"#;
+        assert_eq!(resolve_api_key(Some(html)).unwrap(), "from-page-key");
+    }
+
+    #[test]
+    fn resolve_treats_blank_env_as_unset() {
+        let _guard = EnvGuard::set(Some("   "));
+        let html = r#"ytcfg.set({"INNERTUBE_API_KEY":"from-page-key"});"#;
+        assert_eq!(resolve_api_key(Some(html)).unwrap(), "from-page-key");
+    }
+
+    #[test]
+    fn resolve_fails_clearly_when_missing() {
+        let _guard = EnvGuard::set(None);
+        let err = resolve_api_key(Some("<html></html>")).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains(API_KEY_ENV), "{message}");
+        assert!(message.contains(YTM_DOMAIN), "{message}");
+    }
+
+    #[test]
+    fn signed_in_url_uses_cached_key() {
+        let url = innertube_url("browse", true, "cached-test-key");
+        assert_eq!(
+            url,
+            "https://music.youtube.com/youtubei/v1/browse?alt=json&key=cached-test-key"
+        );
+    }
+
+    #[test]
+    fn guest_url_omits_key() {
+        let url = innertube_url("search", false, "cached-test-key");
+        assert_eq!(url, "https://music.youtube.com/youtubei/v1/search?alt=json");
+        assert!(!url.contains("key="));
+    }
 }

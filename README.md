@@ -51,6 +51,8 @@ the pinned GitHub Release.
 
 Search and home work without login. Library, likes, and playlists need that
 session. Cookies land in `~/.config/omamusic/browser.json` (mode 600).
+Unauthenticated InnerTube uses YouTube's public client key obtained at
+runtime (or `YTM_API_KEY`), not a personal GCP key.
 
 ## Controls
 

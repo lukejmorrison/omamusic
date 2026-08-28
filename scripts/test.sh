@@ -57,6 +57,12 @@ if command -v rg >/dev/null 2>&1; then
     echo "test.sh: forbidden heavyweight runtime dependency found" >&2
     exit 1
   fi
+  google_key_prefix=$(printf '%s%s' AI za)
+  if rg -n --hidden -g '!.git/**' -g '!target/**' -g '!**/__pycache__/**' \
+    "${google_key_prefix}"; then
+    echo "test.sh: Google API key pattern must not be committed" >&2
+    exit 1
+  fi
   if rg -n 'pip install --upgrade pip|ytmusicapi>=' scripts/setup.sh backend/requirements.txt; then
     echo "test.sh: setup must pin hashed requirements, not upgrade pip" >&2
     exit 1
