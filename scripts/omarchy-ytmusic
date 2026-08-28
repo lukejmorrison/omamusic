@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -x $HOME/.local/bin/omamusic ]]; then
+  exec "$HOME/.local/bin/omamusic" "$@"
+fi
+if command -v omamusic >/dev/null 2>&1; then
+  exec omamusic "$@"
+fi
+
 lib_cli="${OMARCHY_YTMUSIC_CLI:-$HOME/.local/lib/omarchy-ytmusic/cli.py}"
 if [[ -f $lib_cli ]]; then
   exec python3 "$lib_cli" "$@"
@@ -11,5 +18,5 @@ if [[ -f $plugin_cli ]]; then
   exec python3 "$plugin_cli" "$@"
 fi
 
-echo "omarchy-ytmusic: CLI is not installed. Run plugins/ytmusic/scripts/setup.sh" >&2
+echo "omarchy-ytmusic: CLI is not installed. Run scripts/setup.sh" >&2
 exit 3

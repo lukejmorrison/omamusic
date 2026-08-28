@@ -28,21 +28,32 @@ talks to a private Unix socket using versioned newline-delimited JSON. When
 stays `$XDG_RUNTIME_DIR/omarchy-ytmusic/backend.sock`.
 
 The backend is supervised by a static systemd user unit that
-is never enabled at login. `omamusic` is a Rust port of the Python daemon. The plugin starts the unit when a UI is visible or
-you press play, and the backend exits after the configured idle period. The
-play queue is written to `play-queue.json` while you listen and on shutdown.
-A restart restores that queue, track, and position, and resumes playback when
-the saved session was playing. If that file is missing, the last local play
-from `play-history.json` is restored paused.
+is never enabled at login. `omamusic` is the default daemon (Rust).
+`scripts/setup.sh` downloads the binary pinned in
+`scripts/backend-release` from GitHub Releases, verifies `SHA256SUMS`,
+and only then tries `cargo` or the Python port. The plugin
+starts the unit when a UI is visible or you press play, and the backend
+exits after the configured idle period. The play queue is written to
+`play-queue.json` while you listen and on shutdown. A restart restores that
+queue, track, and position, and resumes playback when the saved session was
+playing. If that file is missing, the last local play from
+`play-history.json` is restored paused.
 
-Omarchy hot-reloads plugins on any write inside their directory, so the venv
-and installed backend live outside the plugin tree:
+Omarchy hot-reloads plugins on any write inside their directory, so the
+installed backend lives outside the plugin tree. Cargo's target dir is
+`$HOME/.cache/omamusic/target`. Runtime paths:
+
+- `$HOME/.local/bin/omamusic` and `$HOME/.config/systemd/user/omamusic.service`
+- `$HOME/.config/omamusic/browser.json`
+- `$HOME/.config/omamusic/play-history.json`
+- `$HOME/.config/omamusic/play-queue.json`
+- `$XDG_RUNTIME_DIR/omamusic/backend.sock`
+
+Legacy Python fallback (no cargo):
 
 - `$HOME/.local/share/omarchy-ytmusic/venv`
 - `$HOME/.local/lib/omarchy-ytmusic/`
 - `$HOME/.config/omarchy-ytmusic/browser.json`
-- `$HOME/.config/omarchy-ytmusic/play-history.json`
-- `$HOME/.config/omarchy-ytmusic/play-queue.json`
 
 ## Stream resolution
 
@@ -104,10 +115,11 @@ every five minutes so a day-old snapshot does not look signed-out.
 ```
 
 Plugin QML usually hot-reloads on save, but `.pragma library` files
-(`Api.js`) and the installed Python backend do not. `scripts/reload.sh`
-copies `backend/*.py`, restarts `omarchy-ytmusic.service`, restarts
-Omarchy shell, and reopens the player. `--backend-only` skips the shell
-restart. `--no-open` leaves the window closed.
+(`Api.js`) and the installed daemon do not. `scripts/reload.sh` runs
+`setup.sh` (rebuild `omamusic` into `~/.cache/omamusic/target`, or copy
+`backend/*.py` when using Python), restarts the selected user unit,
+restarts Omarchy shell, and reopens the player. `--backend-only` skips
+the shell restart. `--no-open` leaves the window closed.
 
 Complete removal:
 

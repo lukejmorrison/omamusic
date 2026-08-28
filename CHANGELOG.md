@@ -10,6 +10,11 @@
 
 ## Unreleased
 
+- `scripts/setup.sh` installs the `omamusic` Rust daemon from a pinned
+  GitHub Release (no cargo). It builds from source if that download fails
+  and `cargo` is present, and falls back to Python only if both fail.
+  Local rebuilds use `setup.sh --from-source` so Omarchy does not
+  hot-reload the plugin mid-build (`~/.cache/omamusic/target`).
 - Plugin name and bar widget are "OMA Music". Plugin id stays
   `wizwam.omamusic`.
 - `scripts/setup.sh` copies `queue_session.py` with the rest of the Python

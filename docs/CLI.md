@@ -16,8 +16,8 @@ The GUI is documented in [USER.md](USER.md).
 
 `scripts/setup.sh` installs:
 
-- `~/.local/bin/omarchy-ytmusic`
-- `~/.local/lib/omarchy-ytmusic/cli.py`
+- `~/.local/bin/omamusic` (GitHub Release binary, or cargo if that fails)
+- `~/.local/bin/omarchy-ytmusic` (shim that prefers `omamusic`)
 
 For Grok / Hermes / OpenClaw skill links:
 
@@ -31,12 +31,16 @@ player once with Super+Shift+M so the user unit exists.
 ## How it works
 
 ```
-omarchy-ytmusic
-  → NDJSON on $XDG_RUNTIME_DIR/omarchy-ytmusic/backend.sock
-    → omarchy-ytmusic.service (ytmusicapi + mpv + yt-dlp)
+omarchy-ytmusic  (or omamusic)
+  → NDJSON on $XDG_RUNTIME_DIR/omamusic/backend.sock
+    → omamusic.service (mpv + yt-dlp)
 ```
 
-1. If the socket is missing, the CLI starts `omarchy-ytmusic.service`
+Without cargo, the legacy Python socket and unit stay
+`$XDG_RUNTIME_DIR/omarchy-ytmusic/backend.sock` and
+`omarchy-ytmusic.service`.
+
+1. If the socket is missing, the CLI starts the selected user unit
    (`--no-start` skips that). The unit is still not enabled at login.
 2. One request line: `{"v":1,"id":…,"command":"pause"}`.
 3. It skips `event` frames (`state_changed`, `spectrum`) and waits for the

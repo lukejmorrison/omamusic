@@ -11,6 +11,12 @@ command -v omarchy >/dev/null 2>&1 || {
 
 omarchy plugin validate .
 
+command -v cargo >/dev/null 2>&1 || {
+  echo "test.sh: cargo is required to test the default omamusic backend" >&2
+  exit 1
+}
+"$source_root/scripts/test-rust.sh"
+
 python3 "$source_root/backend/server.py" --self-test
 python3 "$source_root/tests/test_catalog.py"
 python3 "$source_root/tests/test_auth.py"
@@ -66,10 +72,23 @@ if command -v rg >/dev/null 2>&1; then
     echo "test.sh: playback-runtime.sh must sync the full backend and health-check" >&2
     exit 1
   fi
+  if ! rg -q 'releases/download' scripts/setup.sh \
+      || ! rg -q 'SHA256SUMS' scripts/setup.sh \
+      || ! rg -q 'CARGO_TARGET_DIR' scripts/setup.sh \
+      || ! rg -q 'omamusic.service' scripts/setup.sh; then
+    echo "test.sh: setup.sh must download a pinned prebuilt omamusic, then cargo" >&2
+    exit 1
+  fi
+  if [[ ! -f scripts/backend-release ]] \
+      || ! rg -q '^RELEASE_VERSION=' scripts/backend-release \
+      || ! rg -q '^RELEASE_REPO=' scripts/backend-release; then
+    echo "test.sh: scripts/backend-release must pin the GitHub Release" >&2
+    exit 1
+  fi
   if ! rg -q 'queue_session.py' scripts/setup.sh \
       || ! rg -q 'play_history.py' scripts/setup.sh \
       || ! rg -q 'spectrum.py' scripts/setup.sh; then
-    echo "test.sh: setup.sh must install the full Python backend" >&2
+    echo "test.sh: setup.sh must keep the Python backend as a cargo-less fallback" >&2
     exit 1
   fi
   if ! rg -q 'omamusic.service' scripts/playback-runtime.sh \
@@ -78,9 +97,14 @@ if command -v rg >/dev/null 2>&1; then
     echo "test.sh: playback-runtime.sh must prefer omamusic when it is installed" >&2
     exit 1
   fi
-  if [[ -f scripts/omarchy-ytmusic ]] && { ! rg -q 'backend/cli.py' scripts/setup.sh \
-      || ! rg -q 'omarchy-ytmusic' scripts/setup.sh; }; then
-    echo "test.sh: setup.sh must install the omarchy-ytmusic CLI" >&2
+  if [[ -f scripts/omarchy-ytmusic ]] && { ! rg -q 'omarchy-ytmusic' scripts/setup.sh \
+      || ! rg -q 'omamusic' scripts/omarchy-ytmusic; }; then
+    echo "test.sh: setup.sh must install the CLI wrapper that prefers omamusic" >&2
+    exit 1
+  fi
+  if ! rg -q 'omamusic.service' scripts/remove-runtime.sh \
+      || ! rg -q 'omamusic' scripts/remove-runtime.sh; then
+    echo "test.sh: remove-runtime.sh must tear down the omamusic unit and binary" >&2
     exit 1
   fi
 fi
@@ -101,8 +125,11 @@ fi
 bash -n scripts/playback-runtime.sh
 bash -n scripts/setup.sh
 bash -n scripts/reload.sh
+bash -n scripts/reload-daemon.sh
+bash -n scripts/remove-runtime.sh
 [[ -f scripts/omarchy-ytmusic ]] && bash -n scripts/omarchy-ytmusic
 [[ -f scripts/install-agent-skill.sh ]] && bash -n scripts/install-agent-skill.sh
 [[ -f scripts/setup-rust.sh ]] && bash -n scripts/setup-rust.sh
+[[ -f scripts/publish-backend.sh ]] && bash -n scripts/publish-backend.sh
 
 echo "All validation and tests passed."

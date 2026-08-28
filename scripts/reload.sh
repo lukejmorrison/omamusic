@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# After a local YouTube Music code change: copy the backend, restart playback,
-# restart Omarchy shell so QML and Api.js reload, then reopen the player.
-# Hot-reload misses .pragma library files (Api.js) and never copies Python.
+# After a local YouTube Music code change: rebuild/install the backend,
+# restart playback, restart Omarchy shell so QML and Api.js reload, then
+# reopen the player. Hot-reload misses .pragma library files (Api.js).
 
 source_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 plugin_id=wizwam.omamusic
@@ -17,12 +17,11 @@ Usage: scripts/reload.sh [--backend-only] [--no-open]
 Reload YouTube Music after a local fix so the running player matches this
 checkout.
 
-  1. Restart the playback daemon (omamusic.service when installed,
-     otherwise copy backend/*.py and restart omarchy-ytmusic.service)
+  1. Rebuild omamusic (or copy backend/*.py) and restart the daemon
   2. Restart Omarchy shell (QML, including Api.js)
   3. Reopen the full player
 
-  --backend-only   Skip the shell restart (Python-only change)
+  --backend-only   Skip the shell restart (daemon-only change)
   --no-open         Do not reopen the full player window
 EOF
 }
@@ -47,6 +46,11 @@ command -v omarchy >/dev/null 2>&1 || {
 }
 
 echo "Reloading YouTube Music playback backend…"
+if command -v cargo >/dev/null 2>&1; then
+  "$source_root/scripts/setup.sh" --from-source
+else
+  "$source_root/scripts/setup.sh"
+fi
 "$source_root/scripts/playback-runtime.sh" restart "$source_root"
 
 if (( restart_shell )); then
