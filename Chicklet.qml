@@ -71,7 +71,7 @@ Item {
   }
 
   PanelToolTip {
-    visible: root.tooltipText !== "" && root.hot
+    visible: root.tooltipText !== "" && mouseArea.containsMouse
     text: root.tooltipText
   }
 }

@@ -10,6 +10,8 @@
 
 ## Unreleased
 
+- Chicklet tooltips show on mouse hover only, so opening the player no
+  longer flashes "Pause · Space" on the play button.
 - CLI, socket, config, and Python fallback all use `omamusic` names.
   Leftover `omarchy-ytmusic` paths are still imported or deleted on
   uninstall. Upstream credits still point at rlimberger/omarchy-ytmusic.
