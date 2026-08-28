@@ -34,6 +34,29 @@ function controlTooltip(label, keys) {
   return name + " · " + shortcut
 }
 
+// Pointer-only chicklet hints. Keyboard focus must not open them, and the
+// QML side delays this long so a click can land before the hint appears.
+function chickletTooltipShowMs() {
+  return 400
+}
+
+function chickletTooltipHideMs() {
+  return 80
+}
+
+function chickletTooltipOpen(tooltipText, pointerInside, hasCursor) {
+  if (hasCursor && !pointerInside) return false
+  return String(tooltipText || "") !== "" && !!pointerInside
+}
+
+function chickletTooltipXY(parentWidth, tooltipWidth, tooltipHeight, gap) {
+  var g = Math.max(0, Number(gap) || 0)
+  return {
+    x: Math.round((Number(parentWidth) || 0) / 2 - (Number(tooltipWidth) || 0) / 2),
+    y: -(Number(tooltipHeight) || 0) - g
+  }
+}
+
 function playerHintRows() {
   return [
     { keys: "Space", action: "Play or pause" },
