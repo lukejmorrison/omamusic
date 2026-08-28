@@ -10,6 +10,10 @@
 
 ## Unreleased
 
+- Plugin name and bar widget are "OMA Music". Plugin id stays
+  `wizwam.omamusic`.
+- `scripts/setup.sh` copies `queue_session.py` with the rest of the Python
+  backend, so local install no longer fails with `ModuleNotFoundError`.
 - Sidebar brand is "OMA Music" / "for YouTube".
 - Sleep timer menu opens in the player window instead of behind it.
 - Prefer the `omamusic` Rust daemon when it is installed. The player UI stays
