@@ -46,8 +46,8 @@ from protocol import (
 
 
 def runtime_dir() -> Path:
-    root = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/omarchy-ytmusic-{os.getuid()}")
-    path = root / "omarchy-ytmusic"
+    root = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/omamusic-{os.getuid()}")
+    path = root / "omamusic"
     path.mkdir(parents=True, exist_ok=True)
     try:
         path.chmod(0o700)
@@ -625,7 +625,7 @@ class Backend:
         os.chmod(path, 0o600)
         server.listen(8)
         server.settimeout(0.5)
-        print(f"omarchy-ytmusic-backend listening on {path}", file=sys.stderr)
+        print(f"omamusic-backend listening on {path}", file=sys.stderr)
         idle_thread = threading.Thread(target=self._idle_watch, daemon=True)
         idle_thread.start()
         position_thread = threading.Thread(target=self._position_watch, daemon=True)
@@ -708,7 +708,7 @@ class Backend:
             video_id = self._catalog_video_id()
             if not video_id or self._stop.is_set():
                 return
-            print("omarchy-ytmusic-backend warming yt-dlp player cache",
+            print("omamusic-backend warming yt-dlp player cache",
                   file=sys.stderr)
             try:
                 self.player.resolver.resolve(video_id)
@@ -776,7 +776,7 @@ class Backend:
                 last_activity=self.player.last_activity,
                 now=time.time(),
             ):
-                print("omarchy-ytmusic-backend idle shutdown", file=sys.stderr)
+                print("omamusic-backend idle shutdown", file=sys.stderr)
                 try:
                     self._remember_queue()
                 except Exception:

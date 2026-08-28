@@ -10,6 +10,9 @@
 
 ## Unreleased
 
+- CLI, socket, config, and Python fallback all use `omamusic` names.
+  Leftover `omarchy-ytmusic` paths are still imported or deleted on
+  uninstall. Upstream credits still point at rlimberger/omarchy-ytmusic.
 - `scripts/setup.sh` installs the `omamusic` Rust daemon from a pinned
   GitHub Release (no cargo). It builds from source if that download fails
   and `cargo` is present, and falls back to Python only if both fail.

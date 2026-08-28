@@ -28,7 +28,7 @@ from protocol import (  # noqa: E402
 CLI_VERSION = "1.0.0"
 DEFAULT_TIMEOUT = 15.0
 CATALOG_TIMEOUT = 45.0
-UNIT = "omarchy-ytmusic.service"
+UNIT = "omamusic.service"
 PANEL_PROP = "wizwam.omamusic.player"
 
 TRANSPORT = ("play", "pause", "toggle", "stop", "next", "previous")
@@ -49,8 +49,8 @@ class CliError(Exception):
 
 
 def socket_path() -> Path:
-    root = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/omarchy-ytmusic-{os.getuid()}")
-    return root / "omarchy-ytmusic" / "backend.sock"
+    root = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/omamusic-{os.getuid()}")
+    return root / "omamusic" / "backend.sock"
 
 
 def format_ms(ms: Any) -> str:
@@ -170,8 +170,8 @@ def format_queue(result: dict[str, Any]) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="omarchy-ytmusic",
-        description="Control the Omarchy YouTube Music player over its local socket.",
+        prog="omamusic",
+        description="Control the OMA Music player over its local socket.",
     )
     parser.add_argument("--json", action="store_true", help="Print the backend JSON response")
     parser.add_argument("--human", action="store_true", help="Pretty-print even when stdout is not a TTY")
@@ -432,7 +432,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.version:
-        print(f"omarchy-ytmusic {CLI_VERSION} protocol={PROTOCOL_VERSION} backend={BACKEND_VERSION}")
+        print(f"omamusic {CLI_VERSION} protocol={PROTOCOL_VERSION} backend={BACKEND_VERSION}")
         return 0
     if not args.command:
         parser.print_help()

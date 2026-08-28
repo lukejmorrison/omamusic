@@ -24,8 +24,8 @@ omarchy pkg add mpv yt-dlp
 The first time you play something, the plugin downloads a prebuilt
 `omamusic` daemon and installs `omamusic.service`, which is **never
 enabled at login**. If that download fails, setup builds from source
-when `cargo` is present, or falls back to `omarchy-ytmusic.service`
-(Python). The player starts the unit when you need it.
+when `cargo` is present, or falls back to a Python `omamusic.service`.
+The player starts the unit when you need it.
 
 ## Sign in
 
@@ -37,7 +37,7 @@ YouTube Music session already in **daily Chromium** (not OpenClaw Chrome on
 2. Super+Shift+M, or click the bar chip.
 3. **Set up and continue** → **Use Chromium session**.
 
-Cookies land in `~/.config/omarchy-ytmusic/browser.json` (mode 600). Do not
+Cookies land in `~/.config/omamusic/browser.json` (mode 600). Do not
 paste that file into chat.
 
 ## Bar chip
@@ -130,6 +130,6 @@ want Spotify back on that key.
 
 ## More
 
-- [CLI.md](CLI.md) — `omarchy-ytmusic` for terminals and agents
+- [CLI.md](CLI.md) — `omamusic` for terminals and agents
 - [TECHNICAL.md](TECHNICAL.md) — socket protocol and backend
 - [UPSTREAM.md](../UPSTREAM.md) — fork pin

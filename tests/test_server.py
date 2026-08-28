@@ -23,7 +23,7 @@ class IsolatedConfigMixin:
     def _isolate_config(self):
         self._config = tempfile.TemporaryDirectory()
         self._previous_config_dir = auth.CONFIG_DIR
-        auth.CONFIG_DIR = Path(self._config.name) / "omarchy-ytmusic"
+        auth.CONFIG_DIR = Path(self._config.name) / "omamusic"
 
     def _restore_config(self):
         auth.CONFIG_DIR = self._previous_config_dir
