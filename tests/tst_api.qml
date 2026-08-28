@@ -134,6 +134,19 @@ TestCase {
     compare(Api.controlTooltip("Volume 80%", ""), "Volume 80%")
   }
 
+  function test_chickletTooltip_isPointerOnlyAndSitsAboveTheControl() {
+    verify(!Api.chickletTooltipOpen("Pause · Space", false, true))
+    verify(!Api.chickletTooltipOpen("Pause · Space", false, false))
+    verify(!Api.chickletTooltipOpen("", true, false))
+    verify(Api.chickletTooltipOpen("Pause · Space", true, true))
+    verify(Api.chickletTooltipOpen("Pause · Space", true, false))
+    compare(Api.chickletTooltipShowMs(), 400)
+    compare(Api.chickletTooltipHideMs(), 80)
+    var pos = Api.chickletTooltipXY(38, 110, 28, 8)
+    compare(pos.x, Math.round(38 / 2 - 110 / 2))
+    compare(pos.y, -36)
+  }
+
   function test_playerHintRows_coverPlaybackLikeAndQueue() {
     var keys = Api.playerHintRows().map(function(row) { return row.keys })
     var actions = Api.playerHintRows().map(function(row) { return row.action })
