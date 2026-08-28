@@ -10,6 +10,9 @@
 
 ## Unreleased
 
+- Resolve YouTube Music's public InnerTube client key at runtime
+  (`YTM_API_KEY`, else `INNERTUBE_API_KEY` from music.youtube.com) so
+  a Google API key is not committed in the tree.
 - Chicklet tooltips show on mouse hover only, so opening the player no
   longer flashes "Pause · Space" on the play button.
 - CLI, socket, config, and Python fallback all use `omamusic` names.
