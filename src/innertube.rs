@@ -74,20 +74,9 @@ impl Innertube {
     }
 
     fn hydrate(&mut self) -> Result<()> {
-        let html = match self.fetch_home_html() {
-            Ok(text) => Some(text),
-            Err(_) => None,
-        };
-        self.visitor_id = html
-            .as_deref()
-            .and_then(parse_ytcfg)
-            .and_then(|cfg| {
-                cfg.get("VISITOR_DATA")
-                    .and_then(Value::as_str)
-                    .map(str::to_string)
-            })
-            .unwrap_or_default();
-        self.api_key = resolve_api_key(html.as_deref())?;
+        let (visitor_id, api_key) = hydrate_from_home(self.signed_in, self.fetch_home_html())?;
+        self.visitor_id = visitor_id;
+        self.api_key = api_key;
         Ok(())
     }
 
@@ -406,6 +395,39 @@ fn resolve_api_key(html: Option<&str>) -> Result<String> {
         }
     }
     Err(missing_api_key_error())
+}
+
+fn parse_visitor_id(html: &str) -> String {
+    parse_ytcfg(html)
+        .and_then(|cfg| {
+            cfg.get("VISITOR_DATA")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_default()
+}
+
+/// Apply homepage HTML (or a fetch failure) to visitor id + cached key.
+/// Guest URLs omit `&key=`, so a missing key is not fatal there. Signed-in
+/// URLs need the key; a homepage fetch error is preserved in that case.
+fn hydrate_from_home(signed_in: bool, fetch: Result<String>) -> Result<(String, String)> {
+    match fetch {
+        Ok(html) => {
+            let visitor_id = parse_visitor_id(&html);
+            match resolve_api_key(Some(&html)) {
+                Ok(key) => Ok((visitor_id, key)),
+                Err(_) if !signed_in => Ok((visitor_id, String::new())),
+                Err(missing) => Err(missing),
+            }
+        }
+        Err(err) => match resolve_api_key(None) {
+            Ok(key) => Ok((String::new(), key)),
+            Err(_) if !signed_in => Ok((String::new(), String::new())),
+            Err(missing) => Err(Error::catalog(format!(
+                "{missing} Homepage fetch failed: {err}"
+            ))),
+        },
+    }
 }
 
 fn build_client() -> Result<Client> {
@@ -992,5 +1014,47 @@ mod tests {
         let url = innertube_url("search", false, "cached-test-key");
         assert_eq!(url, "https://music.youtube.com/youtubei/v1/search?alt=json");
         assert!(!url.contains("key="));
+    }
+
+    #[test]
+    fn guest_hydrate_allows_missing_key() {
+        let _guard = EnvGuard::set(None);
+        let (visitor, key) = hydrate_from_home(false, Ok("<html></html>".into())).unwrap();
+        assert_eq!(visitor, "");
+        assert_eq!(key, "");
+    }
+
+    #[test]
+    fn guest_hydrate_survives_homepage_fetch_error() {
+        let _guard = EnvGuard::set(None);
+        let (visitor, key) =
+            hydrate_from_home(false, Err(Error::catalog("connection refused"))).unwrap();
+        assert_eq!(visitor, "");
+        assert_eq!(key, "");
+    }
+
+    #[test]
+    fn guest_hydrate_still_caches_page_key() {
+        let _guard = EnvGuard::set(None);
+        let html = r#"ytcfg.set({"INNERTUBE_API_KEY":"from-page-key","VISITOR_DATA":"vid"});"#;
+        let (visitor, key) = hydrate_from_home(false, Ok(html.into())).unwrap();
+        assert_eq!(visitor, "vid");
+        assert_eq!(key, "from-page-key");
+    }
+
+    #[test]
+    fn signed_in_hydrate_wraps_homepage_fetch_error() {
+        let _guard = EnvGuard::set(None);
+        let err = hydrate_from_home(true, Err(Error::catalog("connection refused"))).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("connection refused"), "{message}");
+        assert!(message.contains(API_KEY_ENV), "{message}");
+    }
+
+    #[test]
+    fn signed_in_hydrate_uses_env_when_homepage_fails() {
+        let _guard = EnvGuard::set(Some("from-env-test-key"));
+        let (_, key) = hydrate_from_home(true, Err(Error::catalog("connection refused"))).unwrap();
+        assert_eq!(key, "from-env-test-key");
     }
 }
