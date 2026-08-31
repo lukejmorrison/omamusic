@@ -10,6 +10,13 @@
 
 ## Unreleased
 
+- Keep the Chromium YouTube Music session fresh by re-reading the live
+  cookie database on start and every five minutes, instead of relying on
+  a day-old `browser.json` snapshot.
+- Add experimental Google device-code sign-in (`start_oauth`) that stores
+  a refresh token in `oauth.json` without Google Cloud Console. The login
+  page keeps Chromium as the recommended path and probes Music library
+  before treating OAuth as signed in (Innertube still rejects many tokens).
 - Resolve YouTube Music's public InnerTube client key at runtime
   (`YTM_API_KEY`, else `INNERTUBE_API_KEY` from music.youtube.com) so
   a Google API key is not committed in the tree.

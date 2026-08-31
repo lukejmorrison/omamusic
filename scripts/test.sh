@@ -20,6 +20,7 @@ command -v cargo >/dev/null 2>&1 || {
 python3 "$source_root/backend/server.py" --self-test
 python3 "$source_root/tests/test_catalog.py"
 python3 "$source_root/tests/test_auth.py"
+python3 "$source_root/tests/test_oauth.py"
 python3 "$source_root/tests/test_player.py"
 python3 "$source_root/tests/test_protocol.py"
 python3 "$source_root/tests/test_play_history.py"
@@ -73,6 +74,7 @@ if command -v rg >/dev/null 2>&1; then
   fi
   if ! rg -q 'play_history.py' scripts/playback-runtime.sh \
       || ! rg -q 'queue_session.py' scripts/playback-runtime.sh \
+      || ! rg -q 'oauth.py' scripts/playback-runtime.sh \
       || ! rg -q 'spectrum.py' scripts/playback-runtime.sh \
       || ! rg -q 'wait_healthy' scripts/playback-runtime.sh; then
     echo "test.sh: playback-runtime.sh must sync the full backend and health-check" >&2
@@ -93,6 +95,7 @@ if command -v rg >/dev/null 2>&1; then
   fi
   if ! rg -q 'queue_session.py' scripts/setup.sh \
       || ! rg -q 'play_history.py' scripts/setup.sh \
+      || ! rg -q 'oauth.py' scripts/setup.sh \
       || ! rg -q 'spectrum.py' scripts/setup.sh; then
     echo "test.sh: setup.sh must keep the Python backend as a cargo-less fallback" >&2
     exit 1

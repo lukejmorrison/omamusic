@@ -20,6 +20,7 @@ if str(HERE) not in sys.path:
 
 import auth
 import catalog
+import oauth
 import play_history
 import protocol
 import queue_session
@@ -72,9 +73,21 @@ class Backend:
         self.auth_path = auth.default_auth_path() if auth_path is None else auth_path
         self.catalog: Catalog | None = None
         self.signed_in = False
+        self.auth_kind = "none"
         self.account_name = ""
         self.lifecycle = "starting"
         self.error = ""
+        self._oauth_status = "idle"
+        self._oauth_user_code = ""
+        self._oauth_verification_url = ""
+        self._oauth_expires_at = 0
+        self._oauth_error = ""
+        self._oauth_device_code = ""
+        self._oauth_interval = 5
+        self._oauth_generation = 0
+        self._oauth_cancel = threading.Event()
+        self._oauth_thread: threading.Thread | None = None
+        self._oauth_lock = threading.Lock()
         self.idle_minutes = 15
         self.quality_kbps = 320
         self.generation = 0
@@ -104,10 +117,21 @@ class Backend:
         path = auth.resolve_auth_path(str(self.auth_path) if self.auth_path else None)
         self.auth_path = path
         try:
-            if auth.auth_available(path):
-                auth.refresh_browser_authorization(path)
+            if self._activate_oauth_file():
+                self.lifecycle = "ready"
+                self.error = ""
+                return
+            try:
+                path = auth.refresh_live_browser_session(path)
+            except Exception:
+                if auth.auth_available(path):
+                    auth.refresh_browser_authorization(path)
+                else:
+                    path = None
+            if path and auth.auth_available(path):
                 self.catalog = Catalog(YTMusic(str(path)))
                 self.signed_in = True
+                self.auth_kind = "browser"
                 self._auth_refreshed_at = time.time()
                 cookies = auth.export_cookies(path)
                 self.player.resolver.set_cookies(cookies)
@@ -119,6 +143,7 @@ class Backend:
             else:
                 self.catalog = Catalog(YTMusic())
                 self.signed_in = False
+                self.auth_kind = "none"
                 self.account_name = ""
             self.lifecycle = "ready"
             self.error = ""
@@ -126,6 +151,7 @@ class Backend:
             try:
                 self.catalog = Catalog(YTMusic())
                 self.signed_in = False
+                self.auth_kind = "none"
                 self.lifecycle = "ready"
                 self.error = redact(str(exc))
             except Exception as inner:
@@ -140,7 +166,13 @@ class Backend:
             "backend_version": BACKEND_VERSION,
             "protocol_version": PROTOCOL_VERSION,
             "signed_in": self.signed_in,
+            "auth_kind": self.auth_kind,
             "account_name": self.account_name,
+            "oauth_status": self._oauth_status,
+            "oauth_user_code": self._oauth_user_code,
+            "oauth_verification_url": self._oauth_verification_url,
+            "oauth_expires_at": self._oauth_expires_at,
+            "oauth_error": self._oauth_error,
             "playing": self.player.playing,
             "resolving": self.player.resolving,
             "shuffle": self.player.shuffle,
@@ -299,6 +331,10 @@ class Backend:
             return self.setup_auth(str(message.get("headers_raw") or ""))
         if command == "import_browser":
             return self.import_browser()
+        if command == "start_oauth":
+            return self.start_oauth()
+        if command == "cancel_oauth":
+            return self.cancel_oauth()
         if command == "logout":
             return self.logout()
         if command == "set_idle_minutes":
@@ -462,31 +498,174 @@ class Backend:
         self.broadcast()
         return self.state()
 
+    def start_oauth(self) -> dict[str, Any]:
+        self._oauth_cancel.set()
+        self._oauth_generation += 1
+        self._oauth_cancel = threading.Event()
+        self._oauth_status = "requesting"
+        self._oauth_error = ""
+        client = oauth.resolve_client(auth.config_dir())
+        try:
+            device = oauth.request_device_code(client)
+        except Exception as exc:
+            raise AuthError(redact(str(exc))) from exc
+        self._oauth_status = "awaiting_user"
+        self._oauth_user_code = device.user_code
+        self._oauth_verification_url = oauth.verification_link(device)
+        self._oauth_expires_at = oauth.now_unix() + device.expires_in
+        self._oauth_device_code = device.device_code
+        self._oauth_interval = device.interval
+        thread = threading.Thread(
+            target=self._poll_oauth,
+            args=(self._oauth_generation, device, client),
+            daemon=True,
+        )
+        self._oauth_thread = thread
+        thread.start()
+        self.broadcast()
+        return self.state()
+
+    def cancel_oauth(self) -> dict[str, Any]:
+        self._oauth_cancel.set()
+        self._oauth_status = "cancelled"
+        self._oauth_error = "cancelled"
+        self._oauth_user_code = ""
+        self._oauth_verification_url = ""
+        self._oauth_device_code = ""
+        self.broadcast()
+        return self.state()
+
     def logout(self) -> dict[str, Any]:
         try:
             self.player.stop()
         except Exception:
             pass
         auth.clear_auth(self.auth_path)
+        oauth.clear_token(oauth.oauth_path())
+        sidecar = oauth.oauth_path().with_name(".oauth.ytmusic.json")
+        if sidecar.is_file():
+            sidecar.unlink()
+        self.auth_kind = "none"
+        self._oauth_status = "idle"
+        self._oauth_error = ""
         self.start_catalog()
         self.broadcast()
         return self.state()
 
     def _refresh_session(self) -> None:
-        path = self.auth_path
-        if not auth.auth_available(path):
-            return
         now = time.time()
         if self.catalog and self.signed_in and now - self._auth_refreshed_at < 300:
             return
+        if oauth.token_available(oauth.oauth_path()):
+            if self._activate_oauth_file():
+                return
+        path = self.auth_path
+        try:
+            path = auth.refresh_live_browser_session(path)
+        except Exception:
+            if not auth.auth_available(path):
+                return
+            auth.refresh_browser_authorization(path)
+        if not auth.auth_available(path):
+            return
         from ytmusicapi import YTMusic
 
-        auth.refresh_browser_authorization(path)
         self.catalog = Catalog(YTMusic(str(path)))
         self.signed_in = True
+        self.auth_kind = "browser"
         self._auth_refreshed_at = now
         cookies = auth.export_cookies(path)
         self.player.resolver.set_cookies(cookies)
+
+    def _activate_oauth_file(self) -> bool:
+        from ytmusicapi import OAuthCredentials, YTMusic
+
+        path = oauth.oauth_path()
+        if not oauth.token_available(path):
+            return False
+        try:
+            client = oauth.resolve_client(auth.config_dir())
+            token = oauth.load_token(path)
+            now = oauth.now_unix()
+            if token.needs_refresh(now):
+                token = oauth.refresh_access_token(client, token, now)
+                oauth.save_token(path, token)
+            sidecar = path.with_name(".oauth.ytmusic.json")
+            oauth.write_private_json(sidecar, token.as_ytmusic_dict())
+            catalog_client = Catalog(YTMusic(
+                str(sidecar),
+                oauth_credentials=OAuthCredentials(
+                    client_id=client.client_id,
+                    client_secret=client.client_secret,
+                ),
+            ))
+            try:
+                catalog_client.playlists()
+            except Exception as exc:
+                if oauth.looks_oauth_unsupported(str(exc)):
+                    self._oauth_status = "failed"
+                    self._oauth_error = "innertube_rejected"
+                    return False
+                if catalog.looks_unauthorized(exc):
+                    raise
+            info = catalog_client.account()
+            self.account_name = info.get("name") or ""
+            self.catalog = catalog_client
+            self.signed_in = True
+            self.auth_kind = "oauth"
+            self._auth_refreshed_at = time.time()
+            self.player.resolver.set_cookies(None)
+            self._oauth_status = "authorized"
+            self._oauth_error = ""
+            return True
+        except Exception as exc:
+            if oauth.looks_refresh_revoked(str(exc)):
+                oauth.clear_token(path)
+                self._oauth_error = "revoked"
+                return False
+            raise
+
+    def _poll_oauth(self, generation: int, device: oauth.DeviceCode, client: oauth.OAuthClient) -> None:
+        interval = device.interval
+        while not self._oauth_cancel.is_set() and generation == self._oauth_generation:
+            if self._oauth_cancel.wait(interval):
+                return
+            if generation != self._oauth_generation:
+                return
+            status, token, interval = oauth.poll_device_token(
+                client, device, oauth.now_unix()
+            )
+            if status == "pending":
+                self._oauth_interval = interval
+                continue
+            with self._oauth_lock:
+                if generation != self._oauth_generation:
+                    return
+                if status == "authorized" and token is not None:
+                    oauth.save_token(oauth.oauth_path(), token)
+                    try:
+                        if self._activate_oauth_file():
+                            self._oauth_status = "authorized"
+                            self._oauth_error = ""
+                        else:
+                            self._oauth_status = "failed"
+                            if not self._oauth_error:
+                                self._oauth_error = "failed"
+                    except Exception as exc:
+                        self._oauth_status = "failed"
+                        self._oauth_error = "failed"
+                        self.error = redact(str(exc))
+                elif status == "denied":
+                    self._oauth_status = "denied"
+                    self._oauth_error = "denied"
+                elif status == "expired":
+                    self._oauth_status = "expired"
+                    self._oauth_error = "expired"
+                else:
+                    self._oauth_status = "failed"
+                    self._oauth_error = "failed"
+            self.broadcast()
+            return
 
     def browse(self, view: str, force: bool = False) -> dict[str, Any]:
         with self._catalog_lock:

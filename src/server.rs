@@ -1,8 +1,9 @@
 use crate::auth;
-use crate::catalog::{watch_url, Catalog, CatalogOps};
+use crate::catalog::{looks_unauthorized, watch_url, Catalog, CatalogOps};
 use crate::error::{Error, Result};
 use crate::innertube::Innertube;
 use crate::json_util::get_text;
+use crate::oauth::{self, DeviceCode, PollOutcome, ReqwestOAuthHttp};
 use crate::paths::{chmod, AppPaths};
 use crate::play_history;
 use crate::player::{yt_dlp_cache_warm, QueuePlayer};
@@ -47,6 +48,8 @@ pub struct Backend {
     pub generation: i64,
     pub player: QueuePlayer,
     pub local_history: Vec<Value>,
+    pub auth_kind: String,
+    oauth: OAuthFlow,
     last_broadcast: Instant,
     auth_refreshed_at: Instant,
     last_queue_save: Instant,
@@ -62,6 +65,34 @@ pub struct Backend {
 enum BroadcastKind {
     State,
     Spectrum,
+}
+
+struct OAuthFlow {
+    status: String,
+    user_code: String,
+    verification_url: String,
+    expires_at: i64,
+    error: String,
+    device_code: String,
+    interval: u64,
+    generation: u64,
+    cancel: Arc<AtomicBool>,
+}
+
+impl OAuthFlow {
+    fn idle() -> Self {
+        Self {
+            status: "idle".into(),
+            user_code: String::new(),
+            verification_url: String::new(),
+            expires_at: 0,
+            error: String::new(),
+            device_code: String::new(),
+            interval: 5,
+            generation: 0,
+            cancel: Arc::new(AtomicBool::new(false)),
+        }
+    }
 }
 
 impl Backend {
@@ -85,6 +116,8 @@ impl Backend {
             generation: 0,
             player,
             local_history,
+            auth_kind: "none".into(),
+            oauth: OAuthFlow::idle(),
             last_broadcast: Instant::now()
                 .checked_sub(Duration::from_secs(1))
                 .unwrap_or_else(Instant::now),
@@ -111,7 +144,13 @@ impl Backend {
             "backend_version": crate::protocol::BACKEND_VERSION,
             "protocol_version": PROTOCOL_VERSION,
             "signed_in": self.signed_in,
+            "auth_kind": self.auth_kind,
             "account_name": self.account_name,
+            "oauth_status": self.oauth.status,
+            "oauth_user_code": self.oauth.user_code,
+            "oauth_verification_url": self.oauth.verification_url,
+            "oauth_expires_at": self.oauth.expires_at,
+            "oauth_error": self.oauth.error,
             "playing": self.player.playing,
             "resolving": self.player.resolving,
             "shuffle": self.player.shuffle,
@@ -166,13 +205,24 @@ impl Backend {
     }
 
     fn open_catalog(&mut self, path: &Path) -> Result<()> {
-        if auth::auth_available(path) {
-            let _ = auth::refresh_browser_authorization(path);
-            let yt = Innertube::from_browser_json(path)?;
+        if self.activate_oauth_file()? {
+            return Ok(());
+        }
+        let browser = match auth::refresh_live_browser_session(path, None, None) {
+            Ok(updated) => updated,
+            Err(_) if auth::auth_available(path) => {
+                let _ = auth::refresh_browser_authorization(path);
+                path.to_path_buf()
+            }
+            Err(_) => PathBuf::new(),
+        };
+        if !browser.as_os_str().is_empty() && auth::auth_available(&browser) {
+            let yt = Innertube::from_browser_json(&browser)?;
             let catalog = Catalog::new(yt);
             self.signed_in = true;
+            self.auth_kind = "browser".into();
             self.auth_refreshed_at = Instant::now();
-            if let Some(cookies) = auth::export_cookies(path, &self.paths.cookies_path()) {
+            if let Some(cookies) = auth::export_cookies(&browser, &self.paths.cookies_path()) {
                 self.player.resolver.set_cookies(Some(cookies));
             }
             let info = catalog.account();
@@ -182,9 +232,158 @@ impl Backend {
             let yt = Innertube::unauthenticated()?;
             self.catalog = Some(Box::new(Catalog::new(yt)));
             self.signed_in = false;
+            self.auth_kind = "none".into();
             self.account_name.clear();
         }
         Ok(())
+    }
+
+    fn activate_oauth_file(&mut self) -> Result<bool> {
+        let path = self.paths.oauth_path();
+        if !oauth::token_available(&path) {
+            return Ok(false);
+        }
+        let client = match oauth::resolve_client(&self.paths) {
+            Ok(client) => client,
+            Err(_) => return Ok(false),
+        };
+        let mut token = oauth::load_token(&path)?;
+        let now = oauth::now_unix();
+        if token.needs_refresh(now) {
+            match oauth::refresh_access_token(&ReqwestOAuthHttp, &client, &token, now) {
+                Ok(next) => {
+                    token = next;
+                    let _ = oauth::save_token(&path, &token);
+                }
+                Err(err) if oauth::looks_refresh_revoked(&err.to_string()) => {
+                    oauth::clear_token(&path);
+                    self.oauth.error = "revoked".into();
+                    return Ok(false);
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        let yt = Innertube::from_oauth_token(&token.access_token)?;
+        let catalog = Catalog::new(yt);
+        match catalog.playlists(1) {
+            Ok(_) => {}
+            Err(err) => {
+                let text = err.to_string();
+                if oauth::looks_oauth_unsupported(&text) {
+                    self.oauth.status = "failed".into();
+                    self.oauth.error = "innertube_rejected".into();
+                    return Ok(false);
+                }
+                if looks_unauthorized(&text) {
+                    return Err(err);
+                }
+            }
+        }
+        let info = catalog.account();
+        self.account_name = get_text(&info, "name");
+        self.catalog = Some(Box::new(catalog));
+        self.signed_in = true;
+        self.auth_kind = "oauth".into();
+        self.auth_refreshed_at = Instant::now();
+        self.player.resolver.set_cookies(None);
+        self.oauth.status = "authorized".into();
+        self.oauth.error.clear();
+        Ok(true)
+    }
+
+    fn spawn_oauth_poll(backend: Arc<Mutex<Self>>) {
+        thread::spawn(move || {
+            loop {
+                let snapshot = {
+                    let Ok(inner) = backend.lock() else {
+                        return;
+                    };
+                    if inner.oauth.status != "awaiting_user"
+                        || inner.oauth.cancel.load(Ordering::SeqCst)
+                    {
+                        return;
+                    }
+                    (
+                        inner.oauth.generation,
+                        Arc::clone(&inner.oauth.cancel),
+                        inner.oauth.interval,
+                        DeviceCode {
+                            device_code: inner.oauth.device_code.clone(),
+                            user_code: inner.oauth.user_code.clone(),
+                            verification_url: inner.oauth.verification_url.clone(),
+                            expires_in: 0,
+                            interval: inner.oauth.interval,
+                        },
+                        inner.paths.clone(),
+                    )
+                };
+                let (generation, cancel, interval, device, paths) = snapshot;
+                let mut waited = 0u64;
+                while waited < interval.saturating_mul(1000) {
+                    if cancel.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    thread::sleep(Duration::from_millis(200));
+                    waited += 200;
+                }
+                let Ok(client) = oauth::resolve_client(&paths) else {
+                    return;
+                };
+                let Ok(outcome) =
+                    oauth::poll_device_token(&ReqwestOAuthHttp, &client, &device, oauth::now_unix())
+                else {
+                    continue;
+                };
+                let Ok(mut inner) = backend.lock() else {
+                    return;
+                };
+                if inner.oauth.generation != generation
+                    || inner.oauth.cancel.load(Ordering::SeqCst)
+                {
+                    return;
+                }
+                match outcome {
+                    PollOutcome::Pending { interval } => {
+                        inner.oauth.interval = interval;
+                    }
+                    PollOutcome::Authorized(token) => {
+                        if oauth::save_token(&inner.paths.oauth_path(), &token).is_err() {
+                            inner.oauth.status = "failed".into();
+                            inner.oauth.error = "failed".into();
+                        } else if inner.activate_oauth_file().unwrap_or(false) {
+                            inner.oauth.status = "authorized".into();
+                            inner.oauth.error.clear();
+                        } else {
+                            inner.oauth.status = "failed".into();
+                            if inner.oauth.error.is_empty() {
+                                inner.oauth.error = "failed".into();
+                            }
+                        }
+                        inner.poke(BroadcastKind::State);
+                        return;
+                    }
+                    PollOutcome::Denied => {
+                        inner.oauth.status = "denied".into();
+                        inner.oauth.error = "denied".into();
+                        inner.poke(BroadcastKind::State);
+                        return;
+                    }
+                    PollOutcome::Expired => {
+                        inner.oauth.status = "expired".into();
+                        inner.oauth.error = "expired".into();
+                        inner.poke(BroadcastKind::State);
+                        return;
+                    }
+                    PollOutcome::Failed(message) => {
+                        inner.oauth.status = "failed".into();
+                        inner.oauth.error = "failed".into();
+                        inner.error = message;
+                        inner.poke(BroadcastKind::State);
+                        return;
+                    }
+                }
+            }
+        });
     }
 
     pub fn broadcast_locked(backend: &Arc<Mutex<Self>>) {
@@ -277,12 +476,16 @@ impl Backend {
     }
 
     pub fn handle_shared(backend: &Arc<Mutex<Self>>, message: &Value) -> Value {
+        let command = get_text(message, "command");
         let (reply, job) = {
             let mut inner = backend.lock().unwrap();
             let reply = inner.handle_prepare(message);
             let job = inner.player.take_pending_resolve();
             (reply, job)
         };
+        if command == "start_oauth" && reply.get("ok").and_then(Value::as_bool) == Some(true) {
+            Self::spawn_oauth_poll(Arc::clone(backend));
+        }
         if let Some(job) = job {
             Self::spawn_resolve(Arc::clone(backend), job);
         }
@@ -404,6 +607,8 @@ impl Backend {
             "hello" | "ping" | "get_state" => Ok(self.state()),
             "setup_auth" => self.setup_auth(&get_text(message, "headers_raw")),
             "import_browser" => self.import_browser(),
+            "start_oauth" => self.start_oauth(),
+            "cancel_oauth" => self.cancel_oauth(),
             "logout" => self.logout(),
             "set_idle_minutes" => {
                 self.idle_minutes = message
@@ -664,31 +869,79 @@ impl Backend {
         Ok(self.state())
     }
 
+    fn start_oauth(&mut self) -> Result<Value> {
+        self.oauth.cancel.store(true, Ordering::SeqCst);
+        self.oauth.generation += 1;
+        self.oauth.cancel = Arc::new(AtomicBool::new(false));
+        self.oauth.status = "requesting".into();
+        self.oauth.error.clear();
+        let client = oauth::resolve_client(&self.paths)?;
+        let device = oauth::request_device_code(&ReqwestOAuthHttp, &client)
+            .map_err(|e| Error::auth(redact(&e.to_string())))?;
+        self.oauth.status = "awaiting_user".into();
+        self.oauth.user_code = device.user_code.clone();
+        self.oauth.verification_url = oauth::verification_link(&device);
+        self.oauth.expires_at = oauth::now_unix() + device.expires_in as i64;
+        self.oauth.device_code = device.device_code;
+        self.oauth.interval = device.interval;
+        self.poke(BroadcastKind::State);
+        Ok(self.state())
+    }
+
+    fn cancel_oauth(&mut self) -> Result<Value> {
+        self.oauth.cancel.store(true, Ordering::SeqCst);
+        let generation = self.oauth.generation;
+        self.oauth = OAuthFlow::idle();
+        self.oauth.generation = generation;
+        self.oauth.status = "cancelled".into();
+        self.oauth.error = "cancelled".into();
+        self.poke(BroadcastKind::State);
+        Ok(self.state())
+    }
+
     fn logout(&mut self) -> Result<Value> {
         self.player.stop_playback();
         auth::clear_auth(&self.auth_path, &self.paths.cookies_path());
+        auth::clear_oauth(&self.paths.oauth_path());
+        self.auth_kind = "none".into();
+        self.oauth = OAuthFlow::idle();
         self.start_catalog();
         self.poke(BroadcastKind::State);
         Ok(self.state())
     }
 
     fn refresh_session(&mut self) {
-        if !auth::auth_available(&self.auth_path) {
-            return;
-        }
         if self.catalog.is_some()
             && self.signed_in
             && self.auth_refreshed_at.elapsed() < Duration::from_secs(300)
         {
             return;
         }
-        let _ = auth::refresh_browser_authorization(&self.auth_path);
-        if let Ok(yt) = Innertube::from_browser_json(&self.auth_path) {
+        if oauth::token_available(&self.paths.oauth_path()) {
+            if self.activate_oauth_file().unwrap_or(false) {
+                return;
+            }
+        }
+        if !auth::auth_available(&self.auth_path)
+            && auth::iter_cookie_databases().is_empty()
+        {
+            return;
+        }
+        let path = auth::refresh_live_browser_session(&self.auth_path, None, None)
+            .ok()
+            .or_else(|| {
+                let _ = auth::refresh_browser_authorization(&self.auth_path);
+                auth::auth_available(&self.auth_path).then(|| self.auth_path.clone())
+            });
+        let Some(path) = path else {
+            return;
+        };
+        if let Ok(yt) = Innertube::from_browser_json(&path) {
             self.catalog = Some(Box::new(Catalog::new(yt)));
             self.signed_in = true;
+            self.auth_kind = "browser".into();
             self.auth_refreshed_at = Instant::now();
-            if let Some(cookies) = auth::export_cookies(&self.auth_path, &self.paths.cookies_path())
-            {
+            if let Some(cookies) = auth::export_cookies(&path, &self.paths.cookies_path()) {
                 self.player.resolver.set_cookies(Some(cookies));
             }
         }
@@ -1325,6 +1578,40 @@ mod tests {
         paths.ensure().unwrap();
         let backend = Backend::new(paths, Some(dir.path().join("absent.json")));
         (dir, backend)
+    }
+
+    #[test]
+    fn state_reports_auth_kind_and_oauth_fields() {
+        let (_dir, backend) = isolated_backend();
+        let state = backend.state();
+        assert_eq!(state["auth_kind"], "none");
+        assert_eq!(state["oauth_status"], "idle");
+        assert_eq!(state["oauth_user_code"], "");
+        assert!(state.get("oauth_device_code").is_none());
+    }
+
+    #[test]
+    fn logout_clears_oauth_file() {
+        let (dir, mut backend) = isolated_backend();
+        let path = backend.paths.oauth_path();
+        crate::oauth::save_token(
+            &path,
+            &crate::oauth::OAuthToken {
+                version: 1,
+                client_id: "client".into(),
+                access_token: "access".into(),
+                refresh_token: "refresh".into(),
+                token_type: "Bearer".into(),
+                scope: crate::oauth::OAUTH_SCOPE.into(),
+                expires_at: 9_000,
+                expires_in: 3600,
+            },
+        )
+        .unwrap();
+        assert!(path.is_file());
+        backend.logout().unwrap();
+        assert!(!path.is_file());
+        let _ = dir;
     }
 
     #[test]

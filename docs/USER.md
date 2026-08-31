@@ -29,16 +29,25 @@ The player starts the unit when you need it.
 
 ## Sign in
 
-Search and Home work as a guest. Library, likes, and playlists need the
-YouTube Music session already in **daily Chromium** (not OpenClaw Chrome on
-`127.0.0.1:9222`).
+Search and Home work as a guest. Library, likes, and playlists need a
+YouTube Music account. There is no official desktop API.
+
+**Recommended:** use the YouTube Music session already in **daily
+Chromium** (not OpenClaw Chrome on `127.0.0.1:9222`).
 
 1. Sign in at [music.youtube.com](https://music.youtube.com) in Chromium.
 2. Super+Shift+M, or click the bar chip.
-3. **Set up and continue** → **Use Chromium session**.
+3. **Use Chromium session**.
 
-Cookies land in `~/.config/omamusic/browser.json` (mode 600). Do not
-paste that file into chat.
+The player re-reads Chromium on start so that file stays in sync with
+the live browser instead of going stale overnight. Cookies land in
+`~/.config/omamusic/browser.json` (mode 600). Do not paste that file
+into chat.
+
+**Experimental:** **Sign in with Google** opens Google's device-code page
+and stores a refresh token in `~/.config/omamusic/oauth.json`. You do not
+need Google Cloud Console. Google currently rejects many of these tokens
+for Music library, likes, and playlists — if that happens, use Chromium.
 
 ## Bar chip
 

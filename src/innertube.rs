@@ -43,6 +43,14 @@ impl Innertube {
         Self::from_headers_json(&data)
     }
 
+    pub fn from_oauth_token(access_token: &str) -> Result<Self> {
+        Self::from_headers_json(&json!({
+            "authorization": format!("Bearer {access_token}"),
+            "origin": YTM_DOMAIN,
+            "x-origin": YTM_DOMAIN,
+        }))
+    }
+
     pub fn from_headers_json(headers: &Value) -> Result<Self> {
         let client = build_client()?;
         let mut map = default_headers();

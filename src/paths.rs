@@ -46,6 +46,14 @@ impl AppPaths {
         self.config_dir.join("browser.json")
     }
 
+    pub fn oauth_path(&self) -> PathBuf {
+        self.config_dir.join("oauth.json")
+    }
+
+    pub fn oauth_client_path(&self) -> PathBuf {
+        self.config_dir.join("oauth-client.json")
+    }
+
     pub fn history_path(&self) -> PathBuf {
         self.config_dir.join("play-history.json")
     }

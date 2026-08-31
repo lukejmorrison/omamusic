@@ -199,6 +199,10 @@ function redact(value) {
   text = text.replace(/(cookie\s*[:=]\s*)[^\s;]+/ig, "$1<redacted>")
   text = text.replace(/(authorization\s*:\s*)[^\s]+/ig, "$1<redacted>")
   text = text.replace(/(SAPISIDHASH\s+)[^\s]+/ig, "$1<redacted>")
+  text = text.replace(/(access_token=)[^&\s]+/ig, "$1<redacted>")
+  text = text.replace(/(refresh_token=)[^&\s]+/ig, "$1<redacted>")
+  text = text.replace(/(client_secret=)[^&\s]+/ig, "$1<redacted>")
+  text = text.replace(/(device_code=)[^&\s]+/ig, "$1<redacted>")
   return text
 }
 

@@ -67,6 +67,12 @@ class ProtocolTests(unittest.TestCase):
         self.assertNotIn("Bearer abc", text)
         self.assertIn("<redacted>", text)
 
+    def test_redact_oauth_tokens(self):
+        text = redact("client_secret=tv-secret device_code=dev refresh_token=1//r")
+        self.assertNotIn("tv-secret", text)
+        self.assertNotIn("device_code=dev", text)
+        self.assertNotIn("1//r", text)
+
     def test_write_locked_keeps_ndjson_lines_intact(self):
         class Sock:
             def __init__(self):
