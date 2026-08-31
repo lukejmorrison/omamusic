@@ -156,6 +156,7 @@ install_python() {
     "$source_root/backend/server.py" \
     "$source_root/backend/protocol.py" \
     "$source_root/backend/auth.py" \
+    "$source_root/backend/oauth.py" \
     "$source_root/backend/catalog.py" \
     "$source_root/backend/player.py" \
     "$source_root/backend/play_history.py" \

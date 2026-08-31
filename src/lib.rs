@@ -9,6 +9,7 @@ pub mod catalog;
 pub mod cli;
 pub mod error;
 pub mod innertube;
+pub mod oauth;
 pub mod json_util;
 pub mod paths;
 pub mod play_history;

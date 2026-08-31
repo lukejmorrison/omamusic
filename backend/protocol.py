@@ -126,6 +126,8 @@ def redact(value: str) -> str:
         ("authorization", True),
         ("cookie", True),
         ("sapisid", True),
+        ("client_secret", False),
+        ("device_code", False),
         ("access_token", False),
         ("refresh_token", False),
     )

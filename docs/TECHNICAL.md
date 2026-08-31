@@ -42,6 +42,7 @@ installed backend lives outside the plugin tree. Cargo's target dir is
 
 - `$HOME/.local/bin/omamusic` and `$HOME/.config/systemd/user/omamusic.service`
 - `$HOME/.config/omamusic/browser.json`
+- `$HOME/.config/omamusic/oauth.json`
 - `$HOME/.config/omamusic/play-history.json`
 - `$HOME/.config/omamusic/play-queue.json`
 - `$XDG_RUNTIME_DIR/omamusic/backend.sock`
@@ -84,21 +85,44 @@ Band edges match cliamp (`20,100,200,400,800,1600,3200,6400,12800,16000,20000`
 Hz). Capture is `parec` on the default Pulse/PipeWire sink `.monitor`, so the
 bars show post-EQ output rather than the pre-filter stream.
 
-Commands include `hello`, `setup_auth`, `import_browser`, `logout`, `play`, `pause`, `toggle`,
+Commands include `hello`, `setup_auth`, `import_browser`, `start_oauth`, `cancel_oauth`, `logout`, `play`, `pause`, `toggle`,
 `next`, `previous`, `seek`, `set_volume`, `set_shuffle`, `set_repeat`, `load`,
 `add_to_queue`, `search`, `browse`, `get_playlist`, `get_album`, `get_artist`,
 `like`, `create_playlist`, `add_to_playlist`, and `sleep`.
 
 ## Authentication
 
-The usual sign-in path copies the YouTube Music session already in Chromium
-(or Chrome/Brave) on this computer: decrypt the browser cookie database with
-the libsecret OSCrypt key, then write `ytmusicapi` headers with
-`ytmusicapi.setup()`. Pasting request headers is still supported as a
-fallback. Cookies are exported to a Netscape cookie file so yt-dlp can
-resolve member-only or region-locked streams when the session allows it.
-SAPISIDHASH is recomputed from those cookies on backend start and at least
-every five minutes so a day-old snapshot does not look signed-out.
+The recommended sign-in path copies the YouTube Music session already in
+Chromium (or Chrome/Brave) on this computer: decrypt the browser cookie
+database with the libsecret OSCrypt key, then write `ytmusicapi` headers
+with `ytmusicapi.setup()`. The backend re-reads that live cookie database
+on start and at least every five minutes, so `browser.json` is not a
+day-old snapshot. SAPISIDHASH is recomputed whenever the file is rewritten.
+Pasting request headers is still supported as a fallback. Cookies are
+exported to a Netscape cookie file so yt-dlp can resolve member-only or
+region-locked streams when the session allows it.
+
+An experimental Google device-code path (`start_oauth` / `cancel_oauth`)
+uses Google's TV / limited-input grant (the same flow ytmusicapi documents).
+It is **not** YouTube Data API v3 and not an official Music API. Tokens
+land in `$HOME/.config/omamusic/oauth.json` (mode 600): `access_token`,
+`refresh_token`, `expires_at` (computed locally as `now + expires_in`),
+`client_id` of the client that minted them, and the ytmusicapi token
+fields. The client secret is never written next to the user token.
+
+Client credentials resolve in this order: `OMAMUSIC_OAUTH_CLIENT_ID` +
+`OMAMUSIC_OAUTH_CLIENT_SECRET`, then `oauth-client.json`, then the public
+YouTube Android TV device client (a public identifier, not a confidential
+web secret). Testers do not open Google Cloud Console. After Google
+returns a token the backend probes the Music library; if Innertube
+rejects it (`400 invalid argument`, ytmusicapi #813) the player keeps
+Chromium sign-in and reports `oauth_error=innertube_rejected`. Access
+tokens refresh when they expire within 300 seconds. OAuth and cookie
+headers are never mixed.
+
+State includes `auth_kind` (`none` | `browser` | `oauth`), `oauth_status`,
+`oauth_user_code`, `oauth_verification_url`, `oauth_expires_at`, and
+`oauth_error`. `device_code` never leaves the backend.
 
 ## Local development
 

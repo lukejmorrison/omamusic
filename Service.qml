@@ -57,6 +57,18 @@ Item {
     || (backendState && backendState.signed_in === true)
   readonly property string accountName: backendState
     ? String(backendState.account_name || "") : ""
+  readonly property string authKind: backendState
+    ? String(backendState.auth_kind || "") : ""
+  readonly property string oauthStatus: backendState
+    ? String(backendState.oauth_status || "idle") : "idle"
+  readonly property string oauthUserCode: backendState
+    ? String(backendState.oauth_user_code || "") : ""
+  readonly property string oauthVerificationUrl: backendState
+    ? String(backendState.oauth_verification_url || "") : ""
+  readonly property string oauthError: backendState
+    ? String(backendState.oauth_error || "") : ""
+  readonly property bool oauthAwaitingUser: oauthStatus === "awaiting_user"
+    || oauthStatus === "requesting"
   readonly property bool sessionPending: !daemonManager.requirementsChecked
   readonly property bool fullyConnected: daemonManager.playbackReady && backendClient.ready
   property bool authBusy: false
@@ -413,6 +425,24 @@ Item {
         authBusy = false
         if (ok) root.refreshLibrary()
       })
+  }
+
+  function startOauth() {
+    lastError = ""
+    authBusy = true
+    command("start_oauth", {}, "", function(ok, result) {
+      authBusy = false
+      if (!ok) return
+      var url = result && result.oauth_verification_url
+        ? String(result.oauth_verification_url) : root.oauthVerificationUrl
+      if (url) Quickshell.execDetached(["xdg-open", url])
+    })
+  }
+
+  function cancelOauth() {
+    command("cancel_oauth", {}, "", function() {
+      authBusy = false
+    })
   }
 
   function logout() {

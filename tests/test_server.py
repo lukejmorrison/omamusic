@@ -95,6 +95,13 @@ class StreamCacheWarmUpTests(IsolatedConfigMixin, unittest.TestCase):
         self.backend.player.resolving = True
         self.assertIs(self.backend.state()["resolving"], True)
 
+    def test_state_reports_auth_kind_and_oauth_fields(self):
+        state = self.backend.state()
+        self.assertEqual(state["auth_kind"], "none")
+        self.assertEqual(state["oauth_status"], "idle")
+        self.assertEqual(state["oauth_user_code"], "")
+        self.assertNotIn("oauth_device_code", state)
+
 
 class LikeAuthTests(IsolatedConfigMixin, unittest.TestCase):
     def setUp(self):

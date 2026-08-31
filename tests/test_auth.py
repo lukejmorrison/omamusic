@@ -22,6 +22,7 @@ from auth import (  # noqa: E402
     headers_raw_from_cookies,
     parse_cookie_header,
     refresh_browser_authorization,
+    refresh_live_browser_session,
     unpad_pkcs7,
     write_netscape_cookies,
 )
@@ -154,6 +155,19 @@ class AuthTests(unittest.TestCase):
             self.assertIn("SAPISIDHASH ", data["authorization"])
             self.assertNotIn("1000000000_deadbeef", data["authorization"])
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_refresh_live_browser_session_falls_back_to_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "browser.json"
+            path.write_text(json.dumps({
+                "cookie": "SID=abc; __Secure-3PAPISID=tok",
+                "origin": "https://music.youtube.com",
+                "authorization": "SAPISIDHASH 1000000000_deadbeef",
+            }), encoding="utf-8")
+            refreshed = refresh_live_browser_session(path, databases=[])
+            self.assertEqual(refreshed, path)
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertNotIn("1000000000_deadbeef", data["authorization"])
 
 
 if __name__ == "__main__":

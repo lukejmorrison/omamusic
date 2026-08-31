@@ -47,12 +47,15 @@ the pinned GitHub Release.
 
 1. Sign in at [music.youtube.com](https://music.youtube.com) in daily Chromium.
 2. Super+Shift+M, or click the bar icon.
-3. **Set up and continue** → **Use Chromium session**.
+3. **Use Chromium session**.
 
 Search and home work without login. Library, likes, and playlists need that
-session. Cookies land in `~/.config/omamusic/browser.json` (mode 600).
-Unauthenticated InnerTube uses YouTube's public client key obtained at
-runtime (or `YTM_API_KEY`), not a personal GCP key.
+session. The player re-reads the live Chromium cookies so the snapshot does
+not expire overnight. Cookies land in `~/.config/omamusic/browser.json`
+(mode 600). **Sign in with Google** is experimental device OAuth (no Cloud
+Console); Google currently rejects many of those tokens for Music library
+features. Unauthenticated InnerTube uses YouTube's public client key
+obtained at runtime (or `YTM_API_KEY`), not a personal GCP key.
 
 ## Controls
 

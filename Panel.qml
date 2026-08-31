@@ -771,7 +771,7 @@ Item {
 
         Text {
           width: parent.width
-          text: "YouTube Music has no official desktop API. If Chromium on this computer is already signed in at music.youtube.com, copy that session. No DevTools paste."
+          text: "OMA Music uses YouTube Music's unofficial internal interface — there is no official desktop API. Chromium session (recommended) reuses the YouTube Music sign-in already in your browser and keeps it fresh. Sign in with Google is experimental device sign-in; Google currently rejects those tokens for many Music library features."
           color: Qt.darker(root.foreground, 1.3)
           wrapMode: Text.WordWrap
           font.pixelSize: Style.font.body
@@ -802,6 +802,62 @@ Item {
             iconText: "󰖟"
             foreground: root.foreground
             onClicked: Quickshell.execDetached(["xdg-open", "https://music.youtube.com"])
+          }
+        }
+        Button {
+          text: root.service && root.service.oauthAwaitingUser
+            ? "Waiting for Google…"
+            : "Sign in with Google (experimental)"
+          iconText: "󰍹"
+          foreground: root.foreground
+          enabled: root.service && !root.service.oauthAwaitingUser
+          onClicked: {
+            if (!root.service) return
+            root.service.startOauth()
+          }
+        }
+        Column {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: !!(root.service && (root.service.oauthAwaitingUser
+            || root.service.oauthUserCode || root.service.oauthError))
+          Text {
+            width: parent.width
+            visible: !!(root.service && root.service.oauthUserCode)
+            text: root.service && root.service.oauthUserCode
+              ? ("Open Google's device sign-in page and enter this code: "
+                + root.service.oauthUserCode)
+              : ""
+            color: root.foreground
+            wrapMode: Text.WordWrap
+            font.pixelSize: Style.font.subtitle
+          }
+          Row {
+            spacing: Style.space(8)
+            visible: !!(root.service && root.service.oauthVerificationUrl)
+            Button {
+              text: "Open device sign-in"
+              foreground: root.foreground
+              onClicked: {
+                if (!root.service || !root.service.oauthVerificationUrl) return
+                Quickshell.execDetached(["xdg-open", root.service.oauthVerificationUrl])
+              }
+            }
+            Button {
+              text: "Cancel"
+              foreground: root.foreground
+              onClicked: {
+                if (root.service) root.service.cancelOauth()
+              }
+            }
+          }
+          Text {
+            width: parent.width
+            visible: !!(root.service && root.service.oauthError === "innertube_rejected")
+            text: "Google authorized this account, but YouTube Music rejected OAuth for its internal Music interface. Use your Chromium session instead."
+            color: Color.urgent
+            wrapMode: Text.WordWrap
+            font.pixelSize: Style.font.body
           }
         }
         Button {

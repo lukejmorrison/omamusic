@@ -92,8 +92,11 @@ omarchy shell -q wizwam.omamusic.player toggleMiniPlayer
   256 KiB frame cap).
 - Unit: `omamusic.service` (user, not enabled at login).
 - CLI: `~/.local/bin/omamusic`.
-- Catalog/likes need the Chromium session already imported in the player.
-- Related: `google-services` is OAuth playlist editing, not this player.
+- Catalog/likes need the Chromium session already imported in the player
+  (recommended). Experimental Google device sign-in may not unlock Music
+  library; it is not the YouTube Data API.
+- Related: `google-services` is official Google Cloud playlist OAuth, not
+  this player.
 
 ## Troubleshooting
 

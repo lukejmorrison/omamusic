@@ -143,6 +143,8 @@ pub fn redact(value: &str) -> String {
         ("authorization", true),
         ("cookie", true),
         ("sapisid", true),
+        ("client_secret", false),
+        ("device_code", false),
         ("access_token", false),
         ("refresh_token", false),
     ];
@@ -279,6 +281,14 @@ mod tests {
         assert!(!text.contains("supersecret"));
         assert!(!text.contains("Bearer abc"));
         assert!(text.contains("<redacted>"));
+    }
+
+    #[test]
+    fn redact_oauth_tokens() {
+        let text = redact("client_secret=tv-secret device_code=dev refresh_token=1//r");
+        assert!(!text.contains("tv-secret"));
+        assert!(!text.contains("device_code=dev"));
+        assert!(!text.contains("1//r"));
     }
 
     struct Buf(Arc<Mutex<Vec<u8>>>);

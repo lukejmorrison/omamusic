@@ -13,7 +13,7 @@ lib_dir="$HOME/.local/lib/omamusic"
 backend_script="$lib_dir/server.py"
 omamusic_unit=omamusic.service
 legacy_unit=omarchy-ytmusic.service
-backend_files=(server.py protocol.py auth.py catalog.py player.py play_history.py queue_session.py spectrum.py)
+backend_files=(server.py protocol.py auth.py oauth.py catalog.py player.py play_history.py queue_session.py spectrum.py)
 
 omamusic_bin() {
   if [[ -x $HOME/.local/bin/omamusic ]]; then

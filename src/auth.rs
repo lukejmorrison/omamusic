@@ -300,6 +300,10 @@ pub fn clear_auth(auth_path: &Path, cookies_path: &Path) {
     }
 }
 
+pub fn clear_oauth(oauth_path: &Path) {
+    crate::oauth::clear_token(oauth_path);
+}
+
 pub fn iter_cookie_databases() -> Vec<CookieDatabase> {
     let home = crate::paths::home_dir();
     let roots = [
@@ -373,6 +377,28 @@ pub fn import_from_browser(
         ));
     }
     save_headers(&headers_raw_from_cookies(&pairs, "0"), dest)
+}
+
+/// Re-read the live Chromium cookie DB so browser.json is not a stale snapshot.
+///
+/// Falls back to recomputing SAPISIDHASH on the last good file when the
+/// cookie database is locked or the keyring is unavailable.
+pub fn refresh_live_browser_session(
+    dest: &Path,
+    databases: Option<&[CookieDatabase]>,
+    password_for: Option<&HashMap<String, Vec<u8>>>,
+) -> Result<PathBuf> {
+    match import_from_browser(dest, databases, password_for) {
+        Ok(path) => Ok(path),
+        Err(err) => {
+            if auth_available(dest) {
+                refresh_browser_authorization(dest)?;
+                Ok(dest.to_path_buf())
+            } else {
+                Err(err)
+            }
+        }
+    }
 }
 
 pub fn extract_youtube_cookies(
@@ -810,5 +836,30 @@ mod tests {
             fs::metadata(&path).unwrap().permissions().mode() & 0o777,
             0o600
         );
+    }
+
+    #[test]
+    fn refresh_live_browser_session_falls_back_to_snapshot() {
+        let dir = tempdir().unwrap();
+        let paths = AppPaths::for_tests(dir.path());
+        paths.ensure().unwrap();
+        let path = paths.auth_path();
+        fs::write(
+            &path,
+            serde_json::to_string(&json!({
+                "cookie": "SID=abc; __Secure-3PAPISID=tok",
+                "origin": "https://music.youtube.com",
+                "authorization": "SAPISIDHASH 1000000000_deadbeef",
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let refreshed = refresh_live_browser_session(&path, Some(&[]), None).unwrap();
+        assert_eq!(refreshed, path);
+        let data: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(!data["authorization"]
+            .as_str()
+            .unwrap()
+            .contains("1000000000_deadbeef"));
     }
 }

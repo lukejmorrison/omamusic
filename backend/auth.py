@@ -265,6 +265,25 @@ def import_from_browser(
     return path
 
 
+def refresh_live_browser_session(
+    dest: Path | None = None,
+    *,
+    databases: list[CookieDatabase] | None = None,
+    password_for: dict[str, bytes] | None = None,
+) -> Path:
+    """Re-read Chromium cookies so browser.json is not a stale snapshot."""
+    target = dest or default_auth_path()
+    try:
+        return import_from_browser(
+            target, databases=databases, password_for=password_for
+        )
+    except Exception:
+        if auth_available(target):
+            refresh_browser_authorization(target)
+            return target
+        raise
+
+
 def extract_youtube_cookies(
     *,
     databases: list[CookieDatabase] | None = None,

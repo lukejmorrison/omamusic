@@ -1,0 +1,10 @@
+{
+  "access_token": "ya29.test-access",
+  "client_id": "861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com",
+  "expires_at": 1788211200,
+  "expires_in": 3600,
+  "refresh_token": "1//test-refresh",
+  "scope": "https://www.googleapis.com/auth/youtube",
+  "token_type": "Bearer",
+  "version": 1
+}
