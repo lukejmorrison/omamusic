@@ -80,6 +80,10 @@ class Backend:
         self.generation = 0
         self._clients: list[socket.socket] = []
         self._clients_lock = threading.Lock()
+        # Idle time counts from when the last client left, not from the last
+        # playback. A shell plugin reload drops the connection for a moment;
+        # a backend connected for days must not read that as days of idle.
+        self._last_client_at = time.time()
         self._send_lock = threading.Lock()
         self._catalog_lock = threading.Lock()
         self._stop = threading.Event()
@@ -759,6 +763,7 @@ class Backend:
     def _drop(self, client: socket.socket) -> None:
         with self._clients_lock:
             self._clients = [item for item in self._clients if item is not client]
+            self._last_client_at = time.time()
         try:
             client.close()
         except OSError:
@@ -769,11 +774,12 @@ class Backend:
             time.sleep(15)
             with self._clients_lock:
                 clients = len(self._clients)
+                last_client_at = self._last_client_at
             if idle_should_exit(
                 idle_minutes=self.idle_minutes,
                 playing=self.player.playing,
                 client_count=clients,
-                last_activity=self.player.last_activity,
+                last_activity=max(self.player.last_activity, last_client_at),
                 now=time.time(),
             ):
                 print("omamusic-backend idle shutdown", file=sys.stderr)
