@@ -1219,6 +1219,16 @@ fn client_loop(stream: UnixStream, backend: Arc<Mutex<Backend>>, stop: Arc<Atomi
         Err(_) => return,
     };
     let shared_stream = Arc::new(Mutex::new(stream));
+    serve_client(reader_stream, &shared_stream, &backend, &stop);
+    forget_client(&backend, &shared_stream);
+}
+
+fn serve_client(
+    reader_stream: UnixStream,
+    shared_stream: &Arc<Mutex<UnixStream>>,
+    backend: &Arc<Mutex<Backend>>,
+    stop: &AtomicBool,
+) {
     {
         let mut inner = backend.lock().unwrap();
         inner.player.note_activity();
@@ -1226,7 +1236,7 @@ fn client_loop(stream: UnixStream, backend: Arc<Mutex<Backend>>, stop: Arc<Atomi
             .clients
             .lock()
             .unwrap()
-            .push(Arc::clone(&shared_stream));
+            .push(Arc::clone(shared_stream));
         let data = encode_line_default(&event("state_changed", inner.state()));
         let send_lock = Arc::clone(&inner.send_lock);
         drop(inner);
@@ -1260,7 +1270,7 @@ fn client_loop(stream: UnixStream, backend: Arc<Mutex<Backend>>, stop: Arc<Atomi
         let Some(message) = parse_line_default(&line) else {
             continue;
         };
-        let reply = Backend::handle_shared(&backend, &message);
+        let reply = Backend::handle_shared(backend, &message);
         let data = encode_line_default(&reply);
         let send_lock = Arc::clone(&backend.lock().unwrap().send_lock);
         let _g = send_lock.lock().unwrap();
@@ -1272,6 +1282,21 @@ fn client_loop(stream: UnixStream, backend: Arc<Mutex<Backend>>, stop: Arc<Atomi
             }
         }
     }
+}
+
+/// Idle time counts from when the last client left, not from the last
+/// playback. A shell plugin reload drops the connection for a moment; a
+/// backend connected for days must not read that as days of idle.
+fn forget_client(backend: &Arc<Mutex<Backend>>, stream: &Arc<Mutex<UnixStream>>) {
+    let Ok(mut inner) = backend.lock() else {
+        return;
+    };
+    inner
+        .clients
+        .lock()
+        .unwrap()
+        .retain(|client| !Arc::ptr_eq(client, stream));
+    inner.player.note_activity();
 }
 
 pub fn self_test() -> Result<()> {
@@ -1317,6 +1342,23 @@ mod tests {
         assert!(!idle_should_exit(15, true, 0, now - 15.0 * 60.0, now));
         assert!(!idle_should_exit(15, false, 1, now - 15.0 * 60.0, now));
         assert!(!idle_should_exit(0, false, 0, now - 15.0 * 60.0, now));
+    }
+
+    #[test]
+    fn forgetting_last_client_restarts_the_idle_clock() {
+        let (_dir, backend) = isolated_backend();
+        let backend = Arc::new(Mutex::new(backend));
+        let (stream, _peer) = UnixStream::pair().unwrap();
+        let stream = Arc::new(Mutex::new(stream));
+        {
+            let mut inner = backend.lock().unwrap();
+            inner.player.last_activity = 0.0;
+            inner.clients.lock().unwrap().push(Arc::clone(&stream));
+        }
+        forget_client(&backend, &stream);
+        let inner = backend.lock().unwrap();
+        assert!(inner.clients.lock().unwrap().is_empty());
+        assert!(inner.player.last_activity > 0.0);
     }
 
     fn isolated_backend() -> (tempfile::TempDir, Backend) {

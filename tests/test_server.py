@@ -52,6 +52,19 @@ class IdleWatchTests(unittest.TestCase):
             idle_minutes=0, playing=False, client_count=0,
             last_activity=now - 15 * 60, now=now))
 
+    def test_dropping_last_client_restarts_the_idle_clock(self):
+        runtime = tempfile.TemporaryDirectory()
+        self.addCleanup(runtime.cleanup)
+        with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": runtime.name}):
+            backend = Backend(Path(runtime.name) / "absent.json")
+        backend.player.last_activity = 0.0
+        backend._last_client_at = 0.0
+        client = mock.Mock()
+        backend._clients.append(client)
+        backend._drop(client)
+        self.assertGreater(backend._last_client_at, time.time() - 5)
+        self.assertEqual(backend._clients, [])
+
 
 class StreamCacheWarmUpTests(IsolatedConfigMixin, unittest.TestCase):
     """Solving YouTube's player JS challenge before the first play."""
