@@ -21,7 +21,10 @@ Item {
   readonly property string pluginDir: {
     var root = manifest && manifest.__sourceDir ? String(manifest.__sourceDir) : ""
     var sub = manifest && manifest.pluginRoot ? String(manifest.pluginRoot) : ""
-    if (!root) return ""
+    // The shell strips __sourceDir from third-party manifests. This file
+    // sits in the plugin root, so its own URL still locates the scripts.
+    if (!root) return decodeURIComponent(String(Qt.resolvedUrl("."))
+      .replace(/^file:\/\//, "").replace(/\/$/, ""))
     if (!sub || sub.indexOf("..") >= 0 || sub.charAt(0) === "/") return root
     return root + "/" + sub
   }
