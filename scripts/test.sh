@@ -50,6 +50,8 @@ if [[ -x $qml_test_runner ]]; then
     -o -,txt
 fi
 
+"$source_root/scripts/test-detail-loading.sh"
+
 if command -v rg >/dev/null 2>&1; then
   if rg -n 'QtWebEngine|WebEngineView|WebView|node_modules|electron' \
     --glob '*.qml' --glob '*.js' --glob '*.sh' --glob '*.service' \

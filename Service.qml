@@ -828,7 +828,7 @@ Item {
     detailWatch.restart()
     command(request.command, { item_id: request.item_id }, "", function(ok, result) {
       if (requestGen !== root.detailRequestGen) return
-      root.detailWatch.stop()
+      detailWatch.stop()
       root.detailLoading = false
       if (!ok || !result) return
       root.detailItem = result
