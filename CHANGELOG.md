@@ -15,6 +15,8 @@
   a Google API key is not committed in the tree.
 - Chicklet tooltips show on mouse hover only, so opening the player no
   longer flashes "Pause · Space" on the play button.
+- Hovering play no longer covers the chicklet with that hint or eats the
+  click, so playback starts instead of the tooltip jittering over Pause.
 - CLI, socket, config, and Python fallback all use `omamusic` names.
   Leftover `omarchy-ytmusic` paths are still imported or deleted on
   uninstall. Upstream credits still point at rlimberger/omarchy-ytmusic.
