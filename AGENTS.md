@@ -39,6 +39,8 @@ After a local plugin fix, rebuild the daemon and reload QML:
 Tests belong in `tests/` (Python/QML) and `src/` (Rust). Never add
 `test_server.py` at the plugin root.
 
+- This repo is public. When a change alters anything a user can see, add or refresh a screenshot in README.md (images in docs/screenshots/, relative links). The README is the marketing.
+
 ## Do not commit
 
 - `AGENT_FEEDBACK.md`
